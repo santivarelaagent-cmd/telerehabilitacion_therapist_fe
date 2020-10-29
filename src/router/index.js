@@ -1,6 +1,7 @@
 import { createWebHistory, createRouter } from "vue-router"
 import Login from '@/views/login'
-import Home from '@/views/home'
+import Home from '@/views/signedIn/home'
+import SignedIn from '@/views/signedIn/signedIn'
 
 const routes = [
     {
@@ -19,10 +20,18 @@ const routes = [
     },
     {
         path: '/',
-        name: 'home',
-        component: Home,
-        meta: { requiresAuth: true }
-    }
+        name: 'signedIn',
+        component: SignedIn,
+        meta: { requiresAuth: true },
+        children: [
+            {
+                path: '',
+                name: 'home',
+                component: Home,
+                meta: { requiresAuth: true }
+            }
+        ]
+    },
 ]
 
 const router = createRouter({
