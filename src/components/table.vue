@@ -31,7 +31,7 @@
         >
           <button
             class="btn btn-dark"
-            :id="action + '-' + row[0]"
+            :id="'detail-' + row[0]"
             @click="() => $emit('detail', row[0])"
             v-if="actions.includes('detail')"
           >
@@ -40,7 +40,7 @@
           </button>
           <button
             class="btn btn-muted"
-            :id="action + '-' + row[0]"
+            :id="'update-' + row[0]"
             @click="() => $emit('update', row[0])"
             v-if="actions.includes('update')"
           >
@@ -49,7 +49,7 @@
           </button>
           <button
             class="btn btn-danger"
-            :id="action + '-' + row[0]"
+            :id="'delete-' + row[0]"
             @click="() => $emit('delete', row[0])"
             v-if="actions.includes('delete')"
           >

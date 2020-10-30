@@ -1,37 +1,28 @@
 <template>
-  <div class="therapies">
-    <div class="header">
-      <h2 class="header__title dark-text regular-font">Terapias</h2>
-      <button class="btn btn-success" @click="goToCreate">
-        <plus class="light-text" />
-        <span class="btn__label font-family light-font light-text"
-          >Añadir elemento</span
-        >
-      </button>
-    </div>
-    <Table
-      :columns="[
+  <ListModel
+    title="Terapias"
+    :table_info="{
+      columns: [
         { query: 'id', verbose: 'ID' },
         { query: 'name', verbose: 'Nombre' },
         { query: 'description', verbose: 'Descripción' },
-      ]"
-      :actions="['detail', 'update', 'delete']"
-      api_endpoint="/therapies/"
-      @update="goToUpdate"
-      @delete="goToDelete"
-      @detail="goToDetail"
-    />
-  </div>
+      ],
+      actions: ['detail', 'update', 'delete'],
+      api_endpoint: '/therapies/',
+    }"
+    @go-to-create="$router.push({ name: 'new_therapy' })"
+    @go-to-update="goToUpdate"
+    @go-to-delete="goToDelete"
+    @go-to-detail="goToDetail"
+  />
 </template>
 
 <script>
-import { Plus } from "mdue";
-import Table from "../../../components/table";
+import ListModel from "../../../components/listModel";
 export default {
   name: "Therapies",
   components: {
-    Table,
-    Plus,
+    ListModel,
   },
   methods: {
     goToUpdate(id) {
@@ -43,27 +34,6 @@ export default {
     goToDetail(id) {
       console.log("Detail the element", id);
     },
-    goToCreate() {
-      this.$router.push({ name: "new_therapy" });
-    },
   },
 };
 </script>
-
-<style scoped>
-.therapies {
-  height: calc(100vh - 50px);
-  width: 100%;
-  overflow-y: scroll;
-  padding: 10px;
-}
-.header {
-  margin-bottom: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.header__title {
-  margin: 0;
-}
-</style>
