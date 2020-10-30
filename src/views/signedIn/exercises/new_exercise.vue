@@ -1,47 +1,43 @@
 <template>
   <div class="therapies">
     <div class="header">
-      <h2 class="header__title dark-text regular-font">Nueva rutina</h2>
+      <h2 class="header__title dark-text regular-font">Nuevo ejercicio</h2>
     </div>
     <div class="form-wrapper">
-      <form class="create-therapy" @submit.prevent="saveRoutine">
+      <form class="create-therapy" @submit.prevent="saveExercise">
         <div class="danger-bg form-error" v-show="!form_valid">
           <span class="white-text light-font">{{ error_msg }}</span>
         </div>
         <div class="form-group">
-          <label for="therapy" class="light-font dark-text">Terapia</label>
+          <label for="therapy" class="light-font dark-text">Rutina</label>
           <select
-            name="therapy"
-            id="therapy"
-            :class="{ 'light-font': true, 'has-error': !therapy_valid }"
-            v-model="therapy"
+            name="routine"
+            id="routine"
+            :class="{ 'light-font': true, 'has-error': !routine_valid }"
+            v-model="routine"
           >
-            <option
-              value="1"
-              v-if="loading_therapies"
-              class="light-italic-font"
-            >
+            <option value="1" v-if="loading_routines" class="light-italic-font">
               Cargando ...
             </option>
             <option
-              :value="therapie.id"
-              v-for="therapie in therapies"
-              :key="therapie.id"
+              :value="routine.id"
+              v-for="routine in routines"
+              :key="routine.id"
             >
-              {{ therapie.name }}
+              {{ routine.name }}
             </option>
           </select>
         </div>
         <div class="form-group">
           <label for="name" class="light-font dark-text"
-            >Nombre de la rutina</label
+            >Nombre del ejercicio</label
           >
           <input
             type="text"
             name="name"
             id="name"
             :class="{ 'light-font': true, 'has-error': !name_valid }"
-            placeholder="Dale un nombre a la nueva rutina"
+            placeholder="Dale un nombre al nuevo ejercicio"
             v-model="name"
           />
         </div>
@@ -55,9 +51,22 @@
             :class="{ 'light-font': true, 'has-error': !description_valid }"
             cols="30"
             rows="10"
-            placeholder="La rutina debe tener una descripción"
+            placeholder="El ejercicio debe tener una descripción"
             v-model="description"
           ></textarea>
+        </div>
+        <div class="form-group">
+          <label for="name" class="light-font dark-text"
+            >¿En qué posición dentro de la rutina irá este ejercicio?</label
+          >
+          <input
+            type="number"
+            name="order"
+            id="order"
+            :class="{ 'light-font': true, 'has-error': !order_valid }"
+            placeholder="Si eliges 1, este será el primer ejercicio que verá el paciente"
+            v-model="order"
+          />
         </div>
         <div class="form-group form-checkbox">
           <label for="is_model" class="light-font dark-text"
@@ -92,41 +101,46 @@ export default {
   },
 
   async beforeMount() {
-    await this.getTherapies();
+    await this.getRoutines();
   },
 
   methods: {
-    async getTherapies() {
-      this.loading_therapies = true;
+    async getRoutines() {
+      this.loading_routines = true;
       const http = new Http();
-      const response = await http.authGet("/therapies/");
+      const response = await http.authGet("/routines/");
       if (response.status !== 200) {
         console.error("Error on fetch");
         return;
       }
-      this.therapies = response.data.results.map((row) => ({
+      this.routines = response.data.results.map((row) => ({
         id: row.id,
         name: row.name,
       }));
-      this.loading_therapies = false;
+      this.loading_routines = false;
     },
-    async saveRoutine() {
+    async saveExercise() {
       this.loading = true;
       this.name_valid = this.name !== "";
       this.description_valid = this.description !== "";
-      this.therapy_valid = this.therapy !== "";
+      this.routine_valid = this.routine !== "";
+      this.order_valid = !!this.order;
       this.form_valid =
-        this.name_valid && this.description_valid && this.therapy_valid;
+        this.name_valid &&
+        this.description_valid &&
+        this.routine_valid &&
+        this.order_valid;
       if (this.form_valid) {
         const http = new Http();
-        const response = await http.authPost("/routines/", {
+        const response = await http.authPost("/exercises/", {
           name: this.name,
           description: this.description,
-          therapy_id: parseInt(this.therapy),
+          routine_id: parseInt(this.routine),
+          order: this.order,
           is_model: this.is_model,
         });
         if (response.status === 201) {
-          this.$router.push({ name: "routines" });
+          this.$router.push({ name: "exercises" });
         } else {
           this.error_msg = `La petición falló con estado ${response.status}`;
         }
@@ -140,8 +154,8 @@ export default {
   data() {
     return {
       form_valid: true,
-      therapy: "",
-      therapy_valid: true,
+      routine: "",
+      routine_valid: true,
 
       name: "",
       name_valid: true,
@@ -149,11 +163,14 @@ export default {
       description: "",
       description_valid: true,
 
+      order: undefined,
+      order_valid: true,
+
       is_model: false,
 
       loading: false,
-      loading_therapies: false,
-      therapies: [],
+      loading_routines: false,
+      routines: [],
       error_msg: "",
     };
   },
