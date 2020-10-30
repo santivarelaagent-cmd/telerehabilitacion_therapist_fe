@@ -1,10 +1,10 @@
 <template>
   <div class="therapies">
     <div class="header">
-      <h2 class="header__title dark_text regular_font">Terapias</h2>
-      <button class="btn btn-create" @click="goToCreate">
-        <plus class="light_text" />
-        <span class="btn__label font-family light_font light_text"
+      <h2 class="header__title dark-text regular-font">Terapias</h2>
+      <button class="btn btn-success" @click="goToCreate">
+        <plus class="light-text" />
+        <span class="btn__label font-family light-font light-text"
           >Añadir elemento</span
         >
       </button>
