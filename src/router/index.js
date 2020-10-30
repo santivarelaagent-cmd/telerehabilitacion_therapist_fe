@@ -1,6 +1,8 @@
 import { createWebHistory, createRouter } from "vue-router"
 import Login from '@/views/login'
 import Home from '@/views/signedIn/home'
+import Therapies from '@/views/signedIn/therapies/therapies'
+import NewTherapy from '@/views/signedIn/therapies/new_therapy'
 import SignedIn from '@/views/signedIn/signedIn'
 
 const routes = [
@@ -29,14 +31,26 @@ const routes = [
                 name: 'home',
                 component: Home,
                 meta: { requiresAuth: true }
+            },
+            {
+                path: 'therapies',
+                name: 'therapies',
+                component: Therapies,
+                meta: { requiresAuth: true }
+            },
+            {
+                path: 'therapies/new',
+                name: 'new_therapy',
+                component: NewTherapy,
+                meta: { requiresAuth: true }
             }
         ]
     },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes,
+    history: createWebHistory(),
+    routes,
 })
 
 router.beforeEach((to, from, next) => {
@@ -48,7 +62,7 @@ router.beforeEach((to, from, next) => {
                 name: 'login'
             })
         }
-    } else  {
+    } else {
         next()
     }
 })

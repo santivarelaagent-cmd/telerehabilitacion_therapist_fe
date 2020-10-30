@@ -3,6 +3,7 @@ import Storage from './storage'
 class Http {
     constructor() {
         this.APIUrl = 'http://localhost:8000'
+        this.storage = new Storage()
 
         if (typeof Http.instance === 'object') {
             return Http.instance
@@ -12,17 +13,20 @@ class Http {
         return this
     }
 
-    async manageFetch(url, method, body={}, headers={}) {
+    async manageFetch(url, method, body = {}, headers = {}) {
         try {
-            let request = await fetch(url, {
+            const requestData = {
                 method,
-                body: JSON.stringify(body),
                 headers: {
                     ...headers,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 }
-            })
+            }
+            if (method !== 'GET') {
+                requestData.body = JSON.stringify(body)
+            }
+            let request = await fetch(url, requestData)
             let json = await request.json()
             return {
                 data: json,
@@ -35,39 +39,39 @@ class Http {
     }
 
     authHeader() {
-        return {'Authorization': `Token ${Storage.instance.getToken()}`}
+        return { 'Authorization': `Token ${localStorage.getItem('access_token')}` }
     }
 
-    async get(endpoint, headers={}) {
+    async get(endpoint, headers = {}) {
         return await this.manageFetch(this.APIUrl + endpoint, 'GET', {}, headers)
     }
-    async post(endpoint, body, headers={}) {
+    async post(endpoint, body, headers = {}) {
         return await this.manageFetch(this.APIUrl + endpoint, 'POST', body, headers)
     }
-    async put(endpoint, body, headers={}) {
+    async put(endpoint, body, headers = {}) {
         return await this.manageFetch(this.APIUrl + endpoint, 'PUT', body, headers)
     }
-    async patch(endpoint, body, headers={}) {
+    async patch(endpoint, body, headers = {}) {
         return await this.manageFetch(this.APIUrl + endpoint, 'PATCH', body, headers)
     }
-    async delete(endpoint, headers={}) {
+    async delete(endpoint, headers = {}) {
         return await this.manageFetch(this.APIUrl + endpoint, 'DELETE', {}, headers)
     }
 
     async authGet(endpoint) {
-        await this.get(endpoint, this.authHeader())
+        return await this.get(endpoint, this.authHeader())
     }
     async authPost(endpoint) {
-        await this.post(endpoint, this.authHeader())
+        return await this.post(endpoint, this.authHeader())
     }
     async authPut(endpoint) {
-        await this.put(endpoint, this.authHeader())
+        return await this.put(endpoint, this.authHeader())
     }
     async authPatch(endpoint) {
-        await this.patch(endpoint, this.authHeader())
+        return await this.patch(endpoint, this.authHeader())
     }
     async authDelete(endpoint) {
-        await this.delete(endpoint, this.authHeader())
+        return await this.delete(endpoint, this.authHeader())
     }
 }
 

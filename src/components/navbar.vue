@@ -1,10 +1,13 @@
 <template>
   <nav class="navbar dark_bg">
-    <div class="navbar__action__sidebar light_text" @click="toggle_sidebar">
+    <div
+      class="navbar__action__sidebar light_text light_font"
+      @click="toggle_sidebar"
+    >
       <Menu />
     </div>
-    <h3 class="navbar__title light_text">Sitio administrativo</h3>
-    <div class="navbar__user light_text">
+    <h3 class="navbar__title light_text light_font">Sitio administrativo</h3>
+    <div class="navbar__user light_text light_font">
       <account class="" />
       <ul class="user__menu dark_bg">
         <li class="secondary_text user__menu__item">
