@@ -2,62 +2,56 @@
   <div class="table">
     <div class="table__header">
       <div
-        class="table__header--item dark_bg"
+        class="table__header--item dark-bg"
         v-for="(column, idx) in columns_header"
         :key="idx"
       >
-        <span class="header--title light_text light_font">{{ column }}</span>
+        <span class="header--title light-text light-font">{{ column }}</span>
       </div>
     </div>
     <div class="table__loading" v-if="loading">
-      <span class="dark_text regular_font">Cargando...</span>
+      <span class="dark-text regular-font">Cargando...</span>
     </div>
     <div class="table__data" v-if="!loading">
       <div
-        class="table__data__row light_bg"
+        class="table__data__row light-bg"
         v-for="(row, idx) in table_data"
         :key="idx"
       >
         <div
-          class="table__data__cell light_bg"
+          class="table__data__cell light-bg"
           v-for="(cell, idx) in row"
           :key="idx"
         >
-          <span class="dark_text">{{ cell }}</span>
+          <span class="dark-text light-font">{{ cell }}</span>
         </div>
         <div class="table__data__cell" v-if="has_actions">
           <button
-            class="btn btn-detail"
+            class="btn btn-dark"
             :id="action + '-' + row[0]"
             @click="() => $emit('detail', row[0])"
             v-if="actions.includes('detail')"
           >
-            <eye-plus class="light_text" />
-            <span class="btn__label font-family light_font light_text"
-              >Ver más</span
-            >
+            <eye-plus class="light-text" />
+            <span>Ver más</span>
           </button>
           <button
-            class="btn btn-update"
+            class="btn btn-muted"
             :id="action + '-' + row[0]"
             @click="() => $emit('update', row[0])"
             v-if="actions.includes('update')"
           >
-            <lead-pencil class="light_text" />
-            <span class="btn__label font-family light_font light_text"
-              >Actualizar</span
-            >
+            <lead-pencil class="" />
+            <span>Actualizar</span>
           </button>
           <button
-            class="btn btn-delete"
+            class="btn btn-danger"
             :id="action + '-' + row[0]"
             @click="() => $emit('delete', row[0])"
             v-if="actions.includes('delete')"
           >
-            <delete-empty class="light_text" />
-            <span class="btn__label font-family light_font light_text"
-              >Eliminar</span
-            >
+            <delete-empty class="light-text" />
+            <span>Eliminar</span>
           </button>
         </div>
       </div>
