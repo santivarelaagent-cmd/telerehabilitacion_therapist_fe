@@ -1,15 +1,15 @@
 <template>
-  <nav class="navbar dark_bg">
+  <nav class="navbar dark-bg">
     <div
-      class="navbar__action__sidebar light_text light_font"
+      class="navbar__action__sidebar light-text light-font"
       @click="toggle_sidebar"
     >
       <Menu />
     </div>
-    <h3 class="navbar__title light_text light_font">Sitio administrativo</h3>
-    <div class="navbar__user light_text light_font">
+    <h3 class="navbar__title light-text light-font">Sitio administrativo</h3>
+    <div class="navbar__user light-text light-font">
       <account class="" />
-      <ul class="user__menu dark_bg">
+      <ul class="user__menu dark-bg">
         <li class="secondary_text user__menu__item">
           <card-account-details class="user__menu__item--icon" /><span
             class="user__menu__item--text"
