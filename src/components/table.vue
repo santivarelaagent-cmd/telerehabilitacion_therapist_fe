@@ -25,7 +25,10 @@
         >
           <span class="dark-text light-font">{{ cell }}</span>
         </div>
-        <div class="table__data__cell" v-if="has_actions">
+        <div
+          class="table__data__cell table__data__cell--action"
+          v-if="has_actions"
+        >
           <button
             class="btn btn-dark"
             :id="action + '-' + row[0]"
@@ -158,6 +161,10 @@ export default {
   justify-content: flex-start;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
+}
+.table__data__cell--action {
+  display: flex;
+  flex-wrap: wrap;
 }
 .table__loading {
   height: 100%;

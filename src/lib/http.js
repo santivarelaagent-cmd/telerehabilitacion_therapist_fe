@@ -61,14 +61,14 @@ class Http {
     async authGet(endpoint) {
         return await this.get(endpoint, this.authHeader())
     }
-    async authPost(endpoint) {
-        return await this.post(endpoint, this.authHeader())
+    async authPost(endpoint, body) {
+        return await this.post(endpoint, body, this.authHeader())
     }
-    async authPut(endpoint) {
-        return await this.put(endpoint, this.authHeader())
+    async authPut(endpoint, body) {
+        return await this.put(endpoint, body, this.authHeader())
     }
-    async authPatch(endpoint) {
-        return await this.patch(endpoint, this.authHeader())
+    async authPatch(endpoint, body) {
+        return await this.patch(endpoint, body, this.authHeader())
     }
     async authDelete(endpoint) {
         return await this.delete(endpoint, this.authHeader())

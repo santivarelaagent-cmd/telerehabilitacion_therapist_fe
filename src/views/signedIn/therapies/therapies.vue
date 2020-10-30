@@ -43,6 +43,9 @@ export default {
     goToDetail(id) {
       console.log("Detail the element", id);
     },
+    goToCreate() {
+      this.$router.push({ name: "new_therapy" });
+    },
   },
 };
 </script>
