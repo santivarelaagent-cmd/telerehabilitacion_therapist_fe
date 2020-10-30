@@ -1,10 +1,10 @@
 <template>
   <div class="wrapper">
-    <div class="dark_bg login">
-      <form class="secondary_bg login__form" @submit.prevent="login">
-        <h3 class="light_text light_font login__form--title">Bienvenido</h3>
-        <div class="danger_bg login__form--error" v-show="hasError">
-          <span class="white_text light_text light_font">{{ errorMsg }}</span>
+    <div class="dark-bg login">
+      <form class="secondary-bg login__form" @submit.prevent="login">
+        <h3 class="light-text light-font login__form--title">Bienvenido</h3>
+        <div class="danger-bg login__form--error" v-show="hasError">
+          <span class="white-text light-font">{{ errorMsg }}</span>
         </div>
         <input
           type="text"
@@ -18,8 +18,8 @@
           v-model="password"
           class="login__form--input"
         />
-        <button type="submit" class="dark_bg login__form--btn">
-          <span class="font-family light_text light_font">Iniciar sesión</span>
+        <button type="submit" class="dark-bg login__form--btn">
+          <span class="light-font light-text">Iniciar sesión</span>
         </button>
       </form>
     </div>
@@ -82,7 +82,7 @@ export default {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .wrapper {
   height: 100vh;
   display: flex;
@@ -131,8 +131,7 @@ export default {
 }
 
 .login__form--input::placeholder {
-  font-family: "Open Sans";
-  font-weight: 400;
+  @extend .regular-italic-font;
 }
 
 .login__form--btn {
