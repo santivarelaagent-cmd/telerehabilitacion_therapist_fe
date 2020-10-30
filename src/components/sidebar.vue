@@ -1,5 +1,5 @@
 <template>
-  <div class="sidebar dark_bg light_text light_font">
+  <div class="sidebar dark-bg light-text light-font">
     <ul>
       <li
         :class="{
@@ -86,7 +86,7 @@ export default {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .sidebar {
   padding: 10px 0 10px 0;
 }
@@ -110,6 +110,6 @@ export default {
   padding-left: 10px;
 }
 .sidebar__item__active {
-  border-left: 2px solid #3c6fc8;
+  border-left: 2px solid $primary;
 }
 </style>
