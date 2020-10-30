@@ -3,6 +3,8 @@ import Login from '@/views/login'
 import Home from '@/views/signedIn/home'
 import Therapies from '@/views/signedIn/therapies/therapies'
 import NewTherapy from '@/views/signedIn/therapies/new_therapy'
+import Routines from '@/views/signedIn/routines/routines'
+import NewRoutine from '@/views/signedIn/routines/new_routine'
 import SignedIn from '@/views/signedIn/signedIn'
 
 const routes = [
@@ -43,7 +45,19 @@ const routes = [
                 name: 'new_therapy',
                 component: NewTherapy,
                 meta: { requiresAuth: true }
-            }
+            },
+            {
+                path: 'routines',
+                name: 'routines',
+                component: Routines,
+                meta: { requiresAuth: true }
+            },
+            {
+                path: 'routines/new',
+                name: 'new_routine',
+                component: NewRoutine,
+                meta: { requiresAuth: true }
+            },
         ]
     },
 ]
