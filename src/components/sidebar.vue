@@ -16,6 +16,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.routines,
         }"
+        @click="() => goTo('/routines')"
       >
         <clipboard-list class="sidebar__item--icon" />
         <span class="sidebar__item--text" v-show="open">Rutinas</span>
@@ -25,6 +26,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.exercises,
         }"
+        @click="() => goTo('/exercises')"
       >
         <run class="sidebar__item--icon" />
         <span class="sidebar__item--text" v-show="open">Ejercicios</span>
@@ -59,8 +61,12 @@ export default {
       }
     },
     setActiveRoute() {
-      if (this.$route.path === "/therapies") {
+      if (this.$route.path.startsWith("/therapies")) {
         this.activateRoute("therapies");
+      } else if (this.$route.path.startsWith("/routines")) {
+        this.activateRoute("routines");
+      } else if (this.$route.path.startsWith("/exercises")) {
+        this.activateRoute("exercises");
       } else {
         this.activateRoute();
       }
