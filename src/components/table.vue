@@ -68,7 +68,7 @@ import { LeadPencil, DeleteEmpty, EyePlus } from "mdue";
 
 export default {
   name: "Table",
-  props: ["columns", "actions", "api_endpoint"],
+  props: ["columns", "actions", "api_endpoint", "sorting_column"],
 
   components: {
     LeadPencil,
@@ -95,9 +95,11 @@ export default {
         console.error("Error on fetch");
         return;
       }
-      response.data.results.forEach((row) =>
-        this.table_data.push(this.columns.map((column) => row[column.query]))
-      );
+      response.data.results
+        .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
+        .forEach((row) =>
+          this.table_data.push(this.columns.map((column) => row[column.query]))
+        );
     },
   },
 

@@ -13,6 +13,7 @@
       :columns="table_info.columns"
       :actions="table_info.actions"
       :api_endpoint="table_info.api_endpoint"
+      :sorting_column="table_info.sorting_column"
       @update="goToUpdate"
       @delete="goToDelete"
       @detail="goToDetail"
@@ -82,6 +83,18 @@ export default {
       ) {
         errorMessages.push(
           "You have to pass a valid api endpoint! (It most be a string)"
+        );
+      }
+
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          this.table_info,
+          "sorting_column"
+        ) ||
+        typeof this.table_info.api_endpoint !== "string"
+      ) {
+        errorMessages.push(
+          "You have to pass a valid sorting column! (It most be a string)"
         );
       }
     }
