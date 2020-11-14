@@ -82,11 +82,31 @@
             v-model="is_model"
           />
         </div>
+        <div class="form-group"><hr /></div>
         <div class="form-group">
           <label for="video" class="light-font dark-text"
             >Subir un nuevo video</label
           >
           <input type="file" name="video" id="video" @change="videoChanged" />
+        </div>
+        <div class="form-group">
+          <label for="skeleton_points" class="light-font dark-text"
+            >Seleccione los puntos a seguir</label
+          >
+          <select
+            name="skeleton_points"
+            id="skeleton_points"
+            multiple
+            v-model="selected_points"
+          >
+            <option
+              v-for="point in skeleton_points"
+              :value="point.id"
+              :key="point.id"
+            >
+              {{ point.verbose }}
+            </option>
+          </select>
         </div>
         <button type="submit" class="btn btn-success btn-lg">
           <plus />
@@ -112,6 +132,7 @@ export default {
   async beforeMount() {
     await this.getRoutines();
     await this.getExercise();
+    await this.getSkeletonPoints();
   },
 
   methods: {
@@ -156,6 +177,15 @@ export default {
         this.order !== this.exercise.order
       );
     },
+    async getSkeletonPoints() {
+      const http = new Http();
+      const response = await http.authGet("/skeleton/");
+      if (response.status !== 200) {
+        console.error("Error on fetch");
+        return;
+      }
+      this.skeleton_points = response.data;
+    },
     async saveExercise() {
       this.loading = true;
       if (this.formHasChanged()) {
@@ -191,6 +221,7 @@ export default {
       } else {
         console.log("no changes");
         if (this.video) {
+          console.log(this.selected_points);
           const http = new Http();
           let form = new FormData();
           form.append("video", this.video);
@@ -226,6 +257,8 @@ export default {
       loading: false,
       loading_routines: false,
       routines: [],
+      skeleton_points: [],
+      selected_points: [],
       error_msg: "",
     };
   },

@@ -31,7 +31,6 @@ export default {
         name: "edit_exercise",
         params: { exercise_id: id },
       });
-      console.log("Update the element", id);
     },
     goToDelete(id) {
       console.log("Delete the element", id);
