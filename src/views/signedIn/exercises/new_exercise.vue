@@ -140,7 +140,10 @@ export default {
           is_model: this.is_model,
         });
         if (response.status === 201) {
-          this.$router.push({ name: "exercises" });
+          this.$router.push({
+            name: "edit_exercise",
+            params: { exercise_id: response.data.id },
+          });
         } else {
           this.error_msg = `La petición falló con estado ${response.status}`;
         }
