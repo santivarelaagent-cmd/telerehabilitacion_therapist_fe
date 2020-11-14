@@ -27,6 +27,10 @@ export default {
   },
   methods: {
     goToUpdate(id) {
+      this.$router.push({
+        name: "edit_exercise",
+        params: { exercise_id: id },
+      });
       console.log("Update the element", id);
     },
     goToDelete(id) {
