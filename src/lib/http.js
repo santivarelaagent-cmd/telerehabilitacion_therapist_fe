@@ -40,6 +40,27 @@ class Http {
     }
   }
 
+  async manageFetchFormData(url, method, form, headers = {}) {
+    try {
+      const requestData = {
+        method,
+        headers,
+        body: form,
+      };
+      let request = await fetch(url, requestData);
+      let json = await request.json();
+      return {
+        status: request.status,
+        data: json,
+      };
+    } catch (error) {
+      console.error(
+        `Http ${method} method on ${url} failed with error ${error}`
+      );
+      throw Error(error);
+    }
+  }
+
   authHeader() {
     return { Authorization: `Token ${localStorage.getItem("access_token")}` };
   }
@@ -74,6 +95,14 @@ class Http {
       headers
     );
   }
+  async postFormData(endpoint, form, headers = {}) {
+    return await this.manageFetchFormData(
+      this.APIUrl + endpoint,
+      "POST",
+      form,
+      headers
+    );
+  }
 
   async authGet(endpoint) {
     return await this.get(endpoint, this.authHeader());
@@ -90,7 +119,9 @@ class Http {
   async authDelete(endpoint) {
     return await this.delete(endpoint, this.authHeader());
   }
+  async authPostFormData(endpoint, form) {
+    return await this.postFormData(endpoint, form, this.authHeader());
+  }
 }
 
 export default Http;
-
