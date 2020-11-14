@@ -9,6 +9,7 @@
       ],
       actions: ['detail', 'update', 'delete'],
       api_endpoint: '/exercises/',
+      sorting_column: 'id',
     }"
     @go-to-create="$router.push({ name: 'new_exercise' })"
     @go-to-update="goToUpdate"
