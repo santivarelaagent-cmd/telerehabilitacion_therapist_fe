@@ -9,6 +9,7 @@
       ],
       actions: ['detail', 'update', 'delete'],
       api_endpoint: '/therapies/',
+      sorting_column: 'id',
     }"
     @go-to-create="$router.push({ name: 'new_therapy' })"
     @go-to-update="goToUpdate"

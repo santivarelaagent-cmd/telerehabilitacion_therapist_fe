@@ -9,6 +9,7 @@
       ],
       actions: ['detail', 'update', 'delete'],
       api_endpoint: '/routines/',
+      sorting_column: 'id',
     }"
     @go-to-create="$router.push({ name: 'new_routine' })"
     @go-to-update="goToUpdate"
