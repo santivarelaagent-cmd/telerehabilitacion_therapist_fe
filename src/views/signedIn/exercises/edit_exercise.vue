@@ -228,14 +228,24 @@ export default {
         console.log("no changes");
         if (this.video) {
           console.log(this.selected_points);
-          const http = new Http();
-          let form = new FormData();
-          form.append("video", this.video);
-          const response = await http.authPostFormData(
-            `/exercises/${this.$route.params.exercise_id}/video/`,
-            form
-          );
-          console.log(response);
+          console.log(typeof this.selected_points);
+          const points = [];
+          for (let [_, value] of Object.entries(this.selected_points)) {
+            console.log(_, value);
+            points.push(value);
+          }
+          const pointsParsed = points.join(",");
+          if (pointsParsed !== "") {
+            const http = new Http();
+            let form = new FormData();
+            form.append("video", this.video);
+            form.append("points", pointsParsed);
+            const response = await http.authPostFormData(
+              `/exercises/${this.$route.params.exercise_id}/video/`,
+              form
+            );
+            console.log(response);
+          }
         }
       }
       this.loading = false;
