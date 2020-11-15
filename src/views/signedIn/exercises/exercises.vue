@@ -6,6 +6,7 @@
         { query: 'id', verbose: 'ID' },
         { query: 'name', verbose: 'Nombre' },
         { query: 'description', verbose: 'Descripción' },
+        { query: 'status', verbose: 'Estado' },
       ],
       actions: ['detail', 'update', 'delete'],
       api_endpoint: '/exercises/',
