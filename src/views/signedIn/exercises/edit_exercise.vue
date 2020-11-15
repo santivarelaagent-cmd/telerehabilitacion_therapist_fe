@@ -87,7 +87,13 @@
           <label for="video" class="light-font dark-text"
             >Subir un nuevo video</label
           >
-          <input type="file" name="video" id="video" @change="videoChanged" />
+          <input
+            type="file"
+            name="video"
+            id="video"
+            accept="video/*"
+            @change="videoChanged"
+          />
         </div>
         <div class="form-group">
           <label for="skeleton_points" class="light-font dark-text"
