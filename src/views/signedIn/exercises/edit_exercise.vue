@@ -83,36 +83,62 @@
           />
         </div>
         <div class="form-group"><hr /></div>
-        <div class="form-group">
-          <label for="video" class="light-font dark-text"
-            >Subir un nuevo video</label
-          >
-          <input
-            type="file"
-            name="video"
-            id="video"
-            accept="video/*"
-            @change="videoChanged"
-          />
-        </div>
-        <div class="form-group">
-          <label for="skeleton_points" class="light-font dark-text"
-            >Seleccione los puntos a seguir</label
-          >
-          <select
-            name="skeleton_points"
-            id="skeleton_points"
-            multiple
-            v-model="selected_points"
-          >
-            <option
-              v-for="point in skeleton_points"
-              :value="point.id"
-              :key="point.id"
+        <div v-if="status === 'Sin video'">
+          <div class="form-group">
+            <label for="video" class="light-font dark-text"
+              >Subir un nuevo video</label
             >
-              {{ point.verbose }}
-            </option>
-          </select>
+            <input
+              type="file"
+              name="video"
+              id="video"
+              accept="video/*"
+              @change="videoChanged"
+            />
+          </div>
+          <div class="form-group">
+            <label for="skeleton_points" class="light-font dark-text"
+              >Seleccione los puntos a seguir</label
+            >
+            <select
+              name="skeleton_points"
+              id="skeleton_points"
+              multiple
+              v-model="selected_points"
+            >
+              <option
+                v-for="point in skeleton_points"
+                :value="point.id"
+                :key="point.id"
+              >
+                {{ point.verbose }}
+              </option>
+            </select>
+          </div>
+        </div>
+        <div v-else-if="status === 'Video en procesamiento'">
+          <span class="light-font dark-text">Video en procesamiento</span>
+        </div>
+        <div v-else-if="status === 'Video procesado'">
+          <h3 class="light-font dark-text">Video procesado</h3>
+          <h4 class="light-font dark-text">Puntos seguidos</h4>
+          <div class="tracked_points--table">
+            <span class="regular-font verbose">Nombre</span>
+            <span class="regular-font min-angle">Angulo mínimo</span>
+            <span class="regular-font max-angle">Angulo máximo</span>
+            <template v-for="point in tracked_points" :key="point.id">
+              <span class="light-font verbose">{{ point.verbose }}</span>
+              <span class="light-font min-angle">{{
+                parseFloat(point.min_angle).toFixed(2)
+              }}</span>
+              <span class="light-font max-angle">{{
+                parseFloat(point.max_angle).toFixed(2)
+              }}</span>
+            </template>
+          </div>
+        </div>
+        <div v-else-if="status === 'Error al procesar video'">
+          <span class="light-font dark-text">Error al procesar video</span>
         </div>
         <button type="submit" class="btn btn-success btn-lg">
           <plus />
@@ -127,8 +153,9 @@
 <script>
 import { Plus, Cached } from "mdue";
 import Http from "@/lib/http";
+import "@/styles/views/edit_exercise.scss";
 export default {
-  name: "NewTherapy",
+  name: "EditExercise",
 
   components: {
     Plus,
@@ -171,6 +198,10 @@ export default {
         this.name = this.exercise.name;
         this.description = this.exercise.description;
         this.order = this.exercise.order;
+        this.status = this.exercise.status;
+        if (this.status === "Video procesado") {
+          await this.getPointsTracked();
+        }
       } else {
         console.log("TODO: route to 404");
       }
@@ -191,6 +222,17 @@ export default {
         return;
       }
       this.skeleton_points = response.data;
+    },
+    async getPointsTracked() {
+      const http = new Http();
+      const response = await http.authGet(
+        `/exercises/${this.exercise.id}/points_tracked/`
+      );
+      if (response.status !== 200) {
+        console.error("Error on fetch");
+        return;
+      }
+      this.tracked_points = response.data;
     },
     async saveExercise() {
       this.loading = true;
@@ -255,6 +297,7 @@ export default {
   data() {
     return {
       exercise: {},
+      tracked_points: [],
       form_valid: true,
       routine: "",
       routine_valid: true,
@@ -268,6 +311,8 @@ export default {
       order: undefined,
       order_valid: true,
 
+      status: "",
+
       is_model: false,
 
       loading: false,
@@ -280,89 +325,3 @@ export default {
   },
 };
 </script>
-
-<style scoped lang="scss">
-.therapies {
-  height: calc(100vh - 50px);
-  width: 100%;
-  overflow-y: scroll;
-  padding: 10px;
-}
-.header {
-  margin-bottom: 20px;
-}
-.header__title {
-  margin: 0;
-}
-.form-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.create-therapy {
-  border: 1px solid $dark;
-  border-radius: 20px;
-  padding: 1.5em;
-  display: flex;
-  flex-direction: column;
-  button {
-    align-self: flex-end;
-  }
-}
-.form-group {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-
-  * {
-    display: block;
-  }
-  label {
-    margin-bottom: 5px;
-  }
-  textarea {
-    resize: none;
-  }
-  input,
-  textarea,
-  select {
-    margin-bottom: 10px;
-    padding: 5px;
-    padding-left: 10px;
-    padding-right: 10px;
-    border-radius: 10px;
-    border: 0;
-    background-color: $light;
-  }
-  input.has-error,
-  textarea.has-error,
-  select.has-error {
-    border: 1px solid $danger;
-  }
-  input::placeholder,
-  textarea::placeholder {
-    @extend .regular-italic-font;
-  }
-  &.form-checkbox {
-    flex-direction: row;
-    align-items: center;
-    margin-bottom: 10px;
-    input {
-      margin: 0;
-      margin-left: 10px;
-    }
-    label {
-      margin-bottom: 0;
-    }
-  }
-}
-.form-error {
-  margin-bottom: 10px;
-  padding: 5px;
-  padding-left: 10px;
-  border-radius: 30px;
-  border: 0;
-  font-weight: 400;
-  font-size: 0.8em;
-}
-</style>
