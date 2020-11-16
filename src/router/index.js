@@ -3,6 +3,7 @@ import Login from "@/views/login";
 import Home from "@/views/signedIn/home";
 import Therapies from "@/views/signedIn/therapies/therapies";
 import NewTherapy from "@/views/signedIn/therapies/new_therapy";
+import EditTherapy from "@/views/signedIn/therapies/edit_therapy";
 import Routines from "@/views/signedIn/routines/routines";
 import NewRoutine from "@/views/signedIn/routines/new_routine";
 import Exercises from "@/views/signedIn/exercises/exercises";
@@ -47,6 +48,12 @@ const routes = [
         path: "therapies/new",
         name: "new_therapy",
         component: NewTherapy,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "therapies/:therapy_id/edit",
+        name: "edit_therapy",
+        component: EditTherapy,
         meta: { requiresAuth: true },
       },
       {
@@ -103,4 +110,3 @@ router.beforeEach((to, from, next) => {
 });
 
 export default router;
-
