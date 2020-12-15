@@ -27,11 +27,17 @@ class Http {
         requestData.body = JSON.stringify(body);
       }
       let request = await fetch(url, requestData);
-      let json = await request.json();
-      return {
-        data: json,
-        status: request.status,
-      };
+      if (method === "GET") {
+        let json = await request.json();
+        return {
+          data: json,
+          status: request.status,
+        };
+      } else {
+        return {
+          request,
+        };
+      }
     } catch (error) {
       console.error(
         `Http ${method} method on ${url} failed with error ${error}`
