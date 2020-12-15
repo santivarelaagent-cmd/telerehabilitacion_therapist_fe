@@ -22,7 +22,7 @@
     </div>
     <div class="actions-container">
       <div class="actions-wrapper">
-        <button class="btn btn-dark">
+        <button class="btn btn-dark" v-on:click="() => $router.push({name: 'assing_routine', params: {therapy_id: therapy.id}})" >
           <CalendarAccount class="action-icon" />
           <span>Asignar rutina a paciente</span>
         </button>
@@ -32,43 +32,6 @@
         </button>
       </div>
     </div>
-    <h3 class="regular-font dark-text">Asignar rutina a paciente</h3>
-    <p class="regular-font">Paciente</p>
-    <select name="patient" id="patient" v-model="patient">
-      <option
-        v-for="patient in therapy_patients"
-        :value="patient.id"
-        :key="patient.id"
-      >
-        {{
-          patient.patient.user.first_name + ' ' + patient.patient.user.last_name
-        }}
-      </option>
-    </select>
-    <p class="regular-font">Rutina</p>
-    <select name="routines" id="routines" v-model="routine">
-      <option
-        v-for="routine in therapy_routines"
-        :value="routine.id"
-        :key="routine.id"
-      >
-        {{ routine.name }}
-      </option>
-    </select>
-    <p class="regular-font">Fecha</p>
-    <input
-      type="datetime-local"
-      name="start_time"
-      id="start_time"
-      v-model="start_time"
-    />
-    <button
-      class="btn btn-success"
-      style="height: 30px; margin: 30px"
-      @click="schedulePatient"
-    >
-      <span>Guardar</span>
-    </button>
   </div>
 </template>
 
@@ -123,33 +86,7 @@ export default {
       } else {
         console.log('TODO: route to 404');
       }
-    },
-    async schedulePatient() {
-      const http = new Http();
-      const date = new Date(this.start_time);
-      const response = http.authPost('/scheduled_training', {
-        routine: this.routine,
-        therapy_patient: this.patient,
-        start_time: `${
-          date.getDate() < 10 ? '0' + date.getDate() : '' + date.getDate()
-        }/${
-          date.getMonth() + 1 < 10
-            ? '0' + (date.getMonth() + 1)
-            : '' + (date.getMonth() + 1)
-        }/${date.getFullYear()} ${
-          date.getHours() < 10 ? '0' + date.getHours() : '' + date.getHours()
-        }:${
-          date.getMinutes() < 10
-            ? '0' + date.getMinutes()
-            : '' + date.getMinutes()
-        }:${
-          date.getSeconds() < 10
-            ? '0' + date.getSeconds()
-            : '' + date.getSeconds()
-        }`,
-      });
-      console.log(response);
-    },
+    },    
   },
   data() {
     return {
