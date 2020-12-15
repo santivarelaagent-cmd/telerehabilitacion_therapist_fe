@@ -19,8 +19,11 @@
           class="login__form--input"
         />
         <button type="submit" class="dark-bg login__form--btn">
-          <span class="light-font light-text">Iniciar sesión</span>
+          <span class="light-font light-text">Iniciar sesión</span> 
         </button>
+        <div class="loader-wrapper" v-show="loading">
+          <div class="lds-ellipsis"><div></div><div></div><div></div><div></div></div>
+        </div>
       </form>
     </div>
     <div class="img"></div>
@@ -35,39 +38,49 @@ export default {
   name: "Login",
   methods: {
     async login() {
+      this.loading = true;
       this.hasError = false;
       const http = new Http();
       const response = await http.post("/auth/users/login/", {
         username: this.username,
         password: this.password,
       });
-      if (response.status === 201) {
-        const storage = new Storage();
-        const groups = [];
-        const permissions = [];
-        response.data.user.groups.forEach((group) => {
-          groups.push(group.name);
-          group.permissions.forEach((permission) => {
-            permissions.push(permission.codename);
-          });
-        });
-        console.log(groups);
-        if (groups.includes("Admin") || groups.includes("Therapist")) {
-          storage.setToken(response.data.access_token);
-          storage.set("groups", JSON.stringify(groups));
-          storage.set("permissions", JSON.stringify(permissions));
-          this.$router.push("/");
-        } else {
-          this.errorMsg =
-            "Para acceder debe contar con el rol Terapeuta o Administrador.";
-          this.hasError = true;
-        }
-      } else if (response.status >= 400 && response.status <= 500) {
-        this.errorMsg = "Usuario y contraseña no válidas.";
+      if (response.error) {
+        this.errorMsg = "Hubo un error accediendo al servidor. Inténtelo más tarde o comuníquese con el Administrador";
         this.hasError = true;
+        this.loading = false;
       } else {
-        this.errorMsg = "Error interno. Inténtelo más tarde.";
-        this.hasError = true;
+        if (response.status === 201) {
+          const storage = new Storage();
+          const groups = [];
+          const permissions = [];
+          response.data.user.groups.forEach((group) => {
+            groups.push(group.name);
+            group.permissions.forEach((permission) => {
+              permissions.push(permission.codename);
+            });
+          });
+          if (groups.includes("Admin") || groups.includes("Therapist")) {
+            storage.setToken(response.data.access_token);
+            storage.set("groups", JSON.stringify(groups));
+            storage.set("permissions", JSON.stringify(permissions));
+            this.loading = false;
+            this.$router.push("/");
+          } else {
+            this.errorMsg =
+              "Para acceder debe contar con el rol Terapeuta o Administrador.";
+            this.hasError = true;
+            this.loading = false;
+          }
+        } else if (response.status >= 400 && response.status <= 500) {
+          this.errorMsg = "Usuario y contraseña no válidas.";
+          this.hasError = true;
+          this.loading = false;
+        } else {
+          this.errorMsg = "Error interno. Inténtelo más tarde.";
+          this.hasError = true;
+          this.loading = false;
+        }
       }
     },
   },
@@ -77,6 +90,7 @@ export default {
       password: "",
       hasError: false,
       errorMsg: "",
+      loading: false,
     };
   },
 };
@@ -159,4 +173,67 @@ export default {
     width: 80vw;
   }
 }
+
+// Loader
+.loader-wrapper {
+  width: 100%;
+  display:flex;
+  justify-content: center;
+}
+.lds-ellipsis {
+  display: inline-block;
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+.lds-ellipsis div {
+  position: absolute;
+  top: 33px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  animation-timing-function: cubic-bezier(0, 1, 1, 0);
+}
+.lds-ellipsis div:nth-child(1) {
+  left: 8px;
+  animation: lds-ellipsis1 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(2) {
+  left: 8px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(3) {
+  left: 32px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+.lds-ellipsis div:nth-child(4) {
+  left: 56px;
+  animation: lds-ellipsis3 0.6s infinite;
+}
+@keyframes lds-ellipsis1 {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes lds-ellipsis3 {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+@keyframes lds-ellipsis2 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(24px, 0);
+  }
+}
+
 </style>

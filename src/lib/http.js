@@ -29,6 +29,7 @@ class Http {
       let request = await fetch(url, requestData);
       let json = await request.json();
       return {
+        error: false,
         data: json,
         status: request.status,
       };
@@ -36,7 +37,10 @@ class Http {
       console.error(
         `Http ${method} method on ${url} failed with error ${error}`
       );
-      throw Error(error);
+      console.error(error);
+      return {
+        error: true
+      }
     }
   }
 
