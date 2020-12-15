@@ -1,6 +1,7 @@
 import { createWebHistory, createRouter } from "vue-router";
 import Login from "@/views/login";
 import Home from "@/views/signedIn/home";
+import Profile from "@/views/signedIn/profile.vue";
 import Therapies from "@/views/signedIn/therapies/therapies";
 import ViewTherapy from "@/views/signedIn/therapies/view_therapy.vue";
 import NewTherapy from "@/views/signedIn/therapies/new_therapy";
@@ -37,6 +38,12 @@ const routes = [
         path: "",
         name: "home",
         component: Home,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "profile",
+        name: "profile",
+        component: Profile,
         meta: { requiresAuth: true },
       },
       {

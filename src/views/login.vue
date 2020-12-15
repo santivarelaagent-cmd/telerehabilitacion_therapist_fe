@@ -45,13 +45,14 @@ export default {
         const storage = new Storage();
         const groups = [];
         const permissions = [];
+        const {groups: _, ...user} = response.data.user;
+        storage.set('user', JSON.stringify(user));
         response.data.user.groups.forEach((group) => {
           groups.push(group.name);
           group.permissions.forEach((permission) => {
             permissions.push(permission.codename);
           });
         });
-        console.log(groups);
         if (groups.includes("Admin") || groups.includes("Therapist")) {
           storage.setToken(response.data.access_token);
           storage.set("groups", JSON.stringify(groups));
