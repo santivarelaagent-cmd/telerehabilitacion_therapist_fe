@@ -54,52 +54,6 @@
           <cached v-if="loading" class="rotate" />
           <span v-else>Guardar cambios</span>
         </button>
-        <div class="patients-table">
-          <span class="regular-font">Usuario</span>
-          <span class="regular-font">Nombre</span>
-          <template v-for="patient in therapy_patients" :key="patient.id">
-            <span class="light-font">{{ patient.user.username }}</span>
-            <span class="light-font">{{
-              patient.user.first_name + " " + patient.user.last_name
-            }}</span>
-          </template>
-        </div>
-        <h3 class="light-font dark-text">Añadir paciente a esta terapia</h3>
-        <label for="patient" class="light-font dark-text">Paciente</label>
-        <select
-          name="patient"
-          id="patient"
-          class="light-font"
-          v-model="selected_patient"
-        >
-          <option
-            v-for="patient in patients"
-            :value="patient.id"
-            :key="patient.id"
-          >
-            {{ patient.user.first_name + " " + patient.user.last_name }}
-          </option>
-        </select>
-        <label for="therapist" class="light-font dark-text">Terapeuta</label>
-        <select
-          name="therapist"
-          id="therapist"
-          class="light-font"
-          v-model="selected_therapist"
-        >
-          <option
-            v-for="therapist in therapists"
-            :value="therapist.id"
-            :key="therapist.id"
-          >
-            {{ therapist.user.first_name + " " + therapist.user.last_name }}
-          </option>
-        </select>
-        <button class="btn btn-success btn-lg" @click="enrollPatient">
-          <plus />
-          <cached v-if="loading" class="rotate" />
-          <span v-else>Agregar paciente</span>
-        </button>
       </form>
     </div>
   </div>

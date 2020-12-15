@@ -5,16 +5,32 @@
     </h2>
     <h3 class="regular-font dark-text">Descripción:</h3>
     <p class="light-font dark-text">{{ therapy.description }}</p>
-    <h3 class="regular-font dark-text">Pacientes:</h3>
-    <div class="patients-table">
-      <span class="regular-font">Usuario</span>
-      <span class="regular-font">Nombre</span>
-      <template v-for="patient in therapy_patients" :key="patient.id">
-        <span class="light-font">{{ patient.patient.user.username }}</span>
-        <span class="light-font">{{
-          patient.patient.user.first_name + ' ' + patient.patient.user.last_name
-        }}</span>
-      </template>
+    <div class="patients-container">
+      <div class="patients-wrapper">
+        <h3 class="regular-font dark-text">Pacientes:</h3>
+        <div class="patients-table">
+          <span class="regular-font">Usuario</span>
+          <span class="regular-font">Nombre</span>
+          <template v-for="patient in therapy_patients" :key="patient.id">
+            <span class="light-font">{{ patient.patient.user.username }}</span>
+            <span class="light-font">{{
+              patient.patient.user.first_name + ' ' + patient.patient.user.last_name
+            }}</span>
+          </template>
+        </div>
+      </div>
+    </div>
+    <div class="actions-container">
+      <div class="actions-wrapper">
+        <button class="btn btn-dark">
+          <CalendarAccount class="action-icon" />
+          <span>Asignar rutina a paciente</span>
+        </button>
+        <button class="btn btn-light" v-on:click="() => $router.push({name: 'enroll_patient', params: {therapy_id: therapy.id}})" >
+          <ClipboardList class="action-icon" />
+          <span>Inscribir paciente</span>
+        </button>
+      </div>
     </div>
     <h3 class="regular-font dark-text">Asignar rutina a paciente</h3>
     <p class="regular-font">Paciente</p>
@@ -59,12 +75,17 @@
 <script>
 import Http from '@/lib/http';
 import '@/styles/views/edit_therapy.scss';
+import { CalendarAccount, ClipboardList } from "mdue";
 
 export default {
   name: 'ViewTherapy',
   async beforeMount() {
     await this.getTherapy();
     console.log(this.therapy);
+  },
+  components: {
+    CalendarAccount,
+    ClipboardList
   },
   methods: {
     async getTherapy() {
@@ -143,5 +164,38 @@ export default {
 };
 </script>
 
-<style>
+<style lang="scss">
+.patients-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.patients-wrapper {
+  width: 90%;
+  border: 1px solid #2f2f2f;
+  border-radius: 10px;
+  padding: 20px;
+  align-self: center;
+  h3 {
+    margin-top: 0;
+  }
+}
+.actions-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.actions-wrapper {
+  width: 90%;
+  padding: 20px;
+  display: flex;
+  justify-content: space-evenly;
+  button {
+    padding: 10px
+  }
+}
+
+.action-icon {
+  font-size: 2em;
+}
 </style>
