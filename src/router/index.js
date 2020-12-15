@@ -4,6 +4,7 @@ import Home from "@/views/signedIn/home";
 import Profile from "@/views/signedIn/profile.vue";
 import Therapies from "@/views/signedIn/therapies/therapies";
 import ViewTherapy from "@/views/signedIn/therapies/view_therapy.vue";
+import EnrollPatient from "@/views/signedIn/therapies/enroll-patient.vue";
 import NewTherapy from "@/views/signedIn/therapies/new_therapy";
 import EditTherapy from "@/views/signedIn/therapies/edit_therapy";
 import Routines from "@/views/signedIn/routines/routines";
@@ -62,6 +63,12 @@ const routes = [
         path: "therapies/:therapy_id",
         name: "view_therapy",
         component: ViewTherapy,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "therapies/:therapy_id/enroll-patient",
+        name: "enroll_patient",
+        component: EnrollPatient,
         meta: { requiresAuth: true },
       },
       {
