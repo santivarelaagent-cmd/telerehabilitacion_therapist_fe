@@ -3,8 +3,8 @@
 </template>
 
 <script>
-import "./styles/styles.scss";
+import './styles/styles.scss';
 export default {
-  name: "App",
+  name: 'App'
 };
 </script>
