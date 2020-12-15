@@ -10,7 +10,7 @@
     <div class="navbar__user light-text light-font">
       <account class="" />
       <ul class="user__menu dark-bg">
-        <li class="secondary_text user__menu__item">
+        <li class="secondary_text user__menu__item" v-on:click="() => $router.push('/profile')">
           <card-account-details class="user__menu__item--icon" /><span
             class="user__menu__item--text"
             >Perfil</span
