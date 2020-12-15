@@ -5,11 +5,11 @@
       columns: [
         { query: 'id', verbose: 'ID' },
         { query: 'name', verbose: 'Nombre' },
-        { query: 'description', verbose: 'Descripción' },
+        { query: 'description', verbose: 'Descripción' }
       ],
       actions: ['detail', 'update', 'delete'],
       api_endpoint: '/therapies/',
-      sorting_column: 'id',
+      sorting_column: 'id'
     }"
     @go-to-create="$router.push({ name: 'new_therapy' })"
     @go-to-update="goToUpdate"
@@ -19,22 +19,22 @@
 </template>
 
 <script>
-import ListModel from "../../../components/listModel";
+import ListModel from '../../../components/listModel';
 export default {
-  name: "Therapies",
+  name: 'Therapies',
   components: {
-    ListModel,
+    ListModel
   },
   methods: {
-    goToUpdate(id) {
-      console.log("Update the element", id);
-    },
     goToDelete(id) {
-      console.log("Delete the element", id);
+      console.log('Delete the element', id);
     },
-    goToDetail(id) {
-      console.log("Detail the element", id);
+    goToUpdate(therapy_id) {
+      this.$router.push({ name: 'edit_therapy', params: { therapy_id } });
     },
-  },
+    goToDetail(therapy_id) {
+      this.$router.push({ name: 'view_therapy', params: { therapy_id } });
+    }
+  }
 };
 </script>
