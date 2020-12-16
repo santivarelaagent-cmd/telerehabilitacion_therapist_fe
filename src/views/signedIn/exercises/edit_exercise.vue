@@ -100,20 +100,22 @@
             <label for="skeleton_points" class="light-font dark-text"
               >Seleccione los puntos a seguir</label
             >
-            <select
-              name="skeleton_points"
-              id="skeleton_points"
-              multiple
-              v-model="selected_points"
-            >
-              <option
-                v-for="point in skeleton_points"
-                :value="point.id"
-                :key="point.id"
+            <div>
+              <Multiselect
+                class="select light-font"
+                :options="skeleton_points.map(
+                  point => ({
+                    value: point.id,
+                    label: point.verbose
+                  })
+                )"
+                mode="tags"
+                searchable
+                v-model="selected_points"
               >
-                {{ point.verbose }}
-              </option>
-            </select>
+              
+              </Multiselect>
+            </div>
           </div>
         </div>
         <div v-else-if="status === 'Video en procesamiento'">
@@ -154,12 +156,14 @@
 import { Plus, Cached } from "mdue";
 import Http from "@/lib/http";
 import "@/styles/views/edit_exercise.scss";
+import Multiselect from '@vueform/multiselect'
 export default {
   name: "EditExercise",
 
   components: {
     Plus,
     Cached,
+    Multiselect
   },
 
   async beforeMount() {
@@ -268,6 +272,8 @@ export default {
         }
       } else {
         console.log("no changes");
+          console.log(this.selected_points);
+
         if (this.video) {
           console.log(this.selected_points);
           console.log(typeof this.selected_points);
@@ -325,3 +331,4 @@ export default {
   },
 };
 </script>
+<style src="@vueform/multiselect/themes/default.css"></style>
