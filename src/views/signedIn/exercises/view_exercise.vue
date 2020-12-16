@@ -18,8 +18,8 @@
           <span class="regular-font">Ángulo máximo</span>
           <template v-for="point in tracked_points" :key="point.id">
             <span class="light-font">{{point.verbose}}</span>
-            <span class="light-font">{{point.min_angle}}</span>
-            <span class="light-font">{{point.max_angle}}</span>
+            <span class="light-font">{{parseFloat(point.min_angle).toFixed(2)}}</span>
+            <span class="light-font">{{parseFloat(point.max_angle).toFixed(2)}}</span>
           </template>
         </div> 
         <hr>
@@ -32,8 +32,8 @@
             <template v-for="(range, index) in diff.ranges" :key="index">
               <span class="light-font">{{index === 0 ? diff.name : ''}}</span>
               <span class="light-font">{{range.point_tracked.skeleton_point.verbose}}</span>
-              <span class="light-font">{{range.min_angle}}</span>
-              <span class="light-font">{{range.max_angle}}</span>
+              <span class="light-font">{{parseFloat(range.min_angle).toFixed(2)}}</span>
+              <span class="light-font">{{parseFloat(range.max_angle).toFixed(2)}}</span>
             </template>
           </template>
         </div> 
@@ -45,7 +45,7 @@
           <VideoAccount class="action-icon" />
           <span>Asignar video al ejercicio</span>
         </button>
-        <button class="btn btn-dark" v-on:click="() => $router.push({name: 'edit_exercise', params: {exercise_id: exercise.id}})" >
+        <button class="btn btn-dark" v-on:click="() => $router.push({name: 'new_difficulty', params: {exercise_id: exercise.id}})" >
           <RunFast class="action-icon" />
           <span>Asignar nueva dificultad al ejercicio</span>
         </button>
