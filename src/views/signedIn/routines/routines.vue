@@ -19,21 +19,25 @@
 </template>
 
 <script>
-import ListModel from "../../../components/listModel";
+import ListModel from "@/components/listModel";
+import Http from "@/lib/http";
 export default {
   name: "Routines",
   components: {
     ListModel,
   },
   methods: {
-    goToUpdate(id) {
-      console.log("Update the element", id);
+    goToUpdate(routine_id) {
+      console.log("Update the element", routine_id);
     },
-    goToDelete(id) {
-      console.log("Delete the element", id);
+    goToDelete(routine_id) {
+      const http = new Http();
+      http.authDelete(`/routines/${routine_id}/`)
+        .then(response => this.$router.go())
+        .catch(error => console.error(error))
     },
-    goToDetail(id) {
-      console.log("Detail the element", id);
+    goToDetail(routine_id) {
+      console.log("Detail the element", routine_id);
     },
   },
 };
