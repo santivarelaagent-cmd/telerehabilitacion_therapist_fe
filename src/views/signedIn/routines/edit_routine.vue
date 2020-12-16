@@ -83,12 +83,12 @@ export default {
       this.form_valid = this.name_valid && this.description_valid;
       if (this.form_valid) {
         const http = new Http();
-        const response = await http.authPost(`/routines/${this.routine.id}/`, {
+        const response = await http.authPut(`/routines/${this.routine.id}/`, {
           name: this.name,
           description: this.description,
           is_model: this.is_model,
         });
-        if (response.status === 201) {
+        if (response.request.status === 200) {
           this.$router.push({ name: "routines" });
         } else {
           this.error_msg = `La petición falló con estado ${response.status}`;
@@ -105,6 +105,7 @@ export default {
       );
       if (response.status !== 404) {
         this.routine = response.data;
+        console.log(response.data)
         this.name = this.routine.name;
         this.description = this.routine.description;
       } else {
@@ -115,7 +116,7 @@ export default {
 
   data() {
     return {
-      therapy: {},
+      routine: {},
       name: "",
       description: "",
       is_model: false,

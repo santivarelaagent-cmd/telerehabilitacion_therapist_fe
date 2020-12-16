@@ -10,6 +10,7 @@ import NewTherapy from "@/views/signedIn/therapies/new_therapy";
 import EditTherapy from "@/views/signedIn/therapies/edit_therapy";
 import Routines from "@/views/signedIn/routines/routines";
 import NewRoutine from "@/views/signedIn/routines/new_routine";
+import EditRoutine from "@/views/signedIn/routines/edit_routine.vue";
 import ViewRoutine from "@/views/signedIn/routines/view_routine.vue";
 import Exercises from "@/views/signedIn/exercises/exercises";
 import NewExercise from "@/views/signedIn/exercises/new_exercise";
@@ -101,6 +102,12 @@ const routes = [
         path: "routines/:routine_id",
         name: "view_routine",
         component: ViewRoutine,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "routines/:routine_id/edit",
+        name: "edit_routine",
+        component: EditRoutine,
         meta: { requiresAuth: true },
       },
       {
