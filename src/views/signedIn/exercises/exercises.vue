@@ -27,17 +27,20 @@ export default {
     ListModel,
   },
   methods: {
-    goToUpdate(id) {
+    goToUpdate(exercise_id) {
       this.$router.push({
         name: "edit_exercise",
-        params: { exercise_id: id },
+        params: { exercise_id },
       });
     },
     goToDelete(id) {
       console.log("Delete the element", id);
     },
-    goToDetail(id) {
-      console.log("Detail the element", id);
+    goToDetail(exercise_id) {
+      this.$router.push({
+        name: "view_exercise",
+        params: { exercise_id },
+      });
     },
   },
 };

@@ -38,7 +38,7 @@
 <script>
 import Http from '@/lib/http';
 import '@/styles/views/view_routine.scss';
-import { CalendarAccount, ClipboardList } from "mdue";
+import { CalendarAccount } from "mdue";
 
 export default {
   name: 'ViewTherapy',

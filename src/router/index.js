@@ -14,6 +14,7 @@ import EditRoutine from "@/views/signedIn/routines/edit_routine.vue";
 import ViewRoutine from "@/views/signedIn/routines/view_routine.vue";
 import Exercises from "@/views/signedIn/exercises/exercises";
 import NewExercise from "@/views/signedIn/exercises/new_exercise";
+import ViewExercise from "@/views/signedIn/exercises/view_exercise.vue";
 import EditExercise from "@/views/signedIn/exercises/edit_exercise";
 import SignedIn from "@/views/signedIn/signedIn";
 
@@ -120,6 +121,12 @@ const routes = [
         path: "exercises/new",
         name: "new_exercise",
         component: NewExercise,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "exercises/:exercise_id",
+        name: "view_exercise",
+        component: ViewExercise,
         meta: { requiresAuth: true },
       },
       {
