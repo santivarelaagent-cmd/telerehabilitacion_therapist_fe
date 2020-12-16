@@ -83,7 +83,7 @@
           />
         </div>
         <div class="form-group"><hr /></div>
-        <div v-if="status === 'Sin video'">
+        <div>
           <div class="form-group">
             <label for="video" class="light-font dark-text"
               >Subir un nuevo video</label
@@ -117,30 +117,6 @@
               </Multiselect>
             </div>
           </div>
-        </div>
-        <div v-else-if="status === 'Video en procesamiento'">
-          <span class="light-font dark-text">Video en procesamiento</span>
-        </div>
-        <div v-else-if="status === 'Video procesado'">
-          <h3 class="light-font dark-text">Video procesado</h3>
-          <h4 class="light-font dark-text">Puntos seguidos</h4>
-          <div class="tracked_points--table">
-            <span class="regular-font verbose">Nombre</span>
-            <span class="regular-font min-angle">Angulo mínimo</span>
-            <span class="regular-font max-angle">Angulo máximo</span>
-            <template v-for="point in tracked_points" :key="point.id">
-              <span class="light-font verbose">{{ point.verbose }}</span>
-              <span class="light-font min-angle">{{
-                parseFloat(point.min_angle).toFixed(2)
-              }}</span>
-              <span class="light-font max-angle">{{
-                parseFloat(point.max_angle).toFixed(2)
-              }}</span>
-            </template>
-          </div>
-        </div>
-        <div v-else-if="status === 'Error al procesar video'">
-          <span class="light-font dark-text">Error al procesar video</span>
         </div>
         <button type="submit" class="btn btn-success btn-lg">
           <plus />
