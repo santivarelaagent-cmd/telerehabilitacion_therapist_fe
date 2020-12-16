@@ -37,7 +37,12 @@ export default {
         .catch(error => console.error(error))
     },
     goToDetail(routine_id) {
-      console.log("Detail the element", routine_id);
+      this.$router.push({
+        name: 'view_routine',
+        params: {
+          routine_id
+        }
+      })
     },
   },
 };
