@@ -28,7 +28,12 @@ export default {
   },
   methods: {
     goToUpdate(routine_id) {
-      console.log("Update the element", routine_id);
+      this.$router.push({
+        name: 'edit_routine',
+        params: {
+          routine_id
+        }
+      })
     },
     goToDelete(routine_id) {
       const http = new Http();

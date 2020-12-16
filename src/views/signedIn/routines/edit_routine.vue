@@ -2,25 +2,25 @@
   <div class="therapies">
     <div class="header">
       <h2 class="header__title dark-text regular-font">
-        Editando la terapia
-        <span class="light-italic-font">{{ therapy.name }}</span>
+        Editando la rutina
+        <span class="light-italic-font">{{ routine.name }}</span>
       </h2>
     </div>
     <div class="form-wrapper">
-      <form class="create-therapy" @submit.prevent="saveTherapy">
+      <form class="create-therapy" @submit.prevent="saveRoutine">
         <div class="danger-bg form-error" v-show="!form_valid">
           <span class="white-text light-font">{{ error_msg }}</span>
         </div>
         <div class="form-group">
           <label for="name" class="light-font dark-text"
-            >Nombre de la terapia</label
+            >Nombre de la rutine</label
           >
           <input
             type="text"
             name="name"
             id="name"
             :class="{ 'light-font': true, 'has-error': !name_valid }"
-            placeholder="Dale un nombre a la nueva terapia"
+            placeholder="Dale un nombre a la nueva rutina"
             v-model="name"
           />
         </div>
@@ -34,7 +34,7 @@
             :class="{ 'light-font': true, 'has-error': !description_valid }"
             cols="30"
             rows="10"
-            placeholder="La terapia debe tener una descripción"
+            placeholder="La rutina debe tener una descripción"
             v-model="description"
           ></textarea>
         </div>
@@ -64,7 +64,7 @@ import { Plus, Cached } from "mdue";
 import Http from "@/lib/http";
 import "@/styles/views/edit_therapy.scss";
 export default {
-  name: "EditTherapy",
+  name: "EditRoutine",
 
   components: {
     Plus,
@@ -72,27 +72,24 @@ export default {
   },
 
   async beforeMount() {
-    await this.getTherapy();
-    await this.getPatients();
-    await this.getTherapists();
+    await this.getRoutine();
   },
 
   methods: {
-    async saveTherapy() {
+    async saveRoutine() {
       this.loading = true;
       this.name_valid = this.name !== "";
       this.description_valid = this.description !== "";
       this.form_valid = this.name_valid && this.description_valid;
       if (this.form_valid) {
         const http = new Http();
-        const response = await http.authPut(`/therapies/${this.therapy.id}/`, {
+        const response = await http.authPut(`/routines/${this.routine.id}/`, {
           name: this.name,
           description: this.description,
           is_model: this.is_model,
         });
         if (response.request.status === 200) {
-          console.log('here')
-          this.$router.push({ name: "therapies" });
+          this.$router.push({ name: "routines" });
         } else {
           this.error_msg = `La petición falló con estado ${response.status}`;
         }
@@ -101,67 +98,25 @@ export default {
       }
       this.loading = false;
     },
-    async getTherapy() {
+    async getRoutine() {
       const http = new Http();
       const response = await http.authGet(
-        `/therapies/${this.$route.params.therapy_id}`
+        `/routines/${this.$route.params.routine_id}`
       );
       if (response.status !== 404) {
-        this.therapy = response.data;
-        this.name = this.therapy.name;
-        this.description = this.therapy.description;
-        await this.getTherapyPatients();
+        this.routine = response.data;
+        console.log(response.data)
+        this.name = this.routine.name;
+        this.description = this.routine.description;
       } else {
         console.log("TODO: route to 404");
       }
-    },
-    async getPatients() {
-      const http = new Http();
-      const response = await http.authGet(`/patients`);
-      if (response.status !== 404) {
-        this.patients = response.data;
-      } else {
-        console.log("TODO: route to 404");
-      }
-    },
-    async getTherapists() {
-      const http = new Http();
-      const response = await http.authGet(`/therapists`);
-      if (response.status !== 404) {
-        this.therapists = response.data;
-      } else {
-        console.log("TODO: route to 404");
-      }
-    },
-    async getTherapyPatients() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/therapies/${this.$route.params.therapy_id}/get_patients/`
-      );
-      if (response.status !== 404) {
-        this.therapy_patients = response.data;
-      } else {
-        console.log("TODO: route to 404");
-      }
-    },
-    async enrollPatient() {
-      const http = new Http();
-      const response = await http.authPost(
-        `/therapies/${this.therapy.id}/enroll_patient/`,
-        {
-          therapy: this.therapy.id,
-          therapist: this.selected_therapist,
-          patient: this.selected_patient,
-        }
-      );
-      console.log(response);
-      this.$router.go();
     },
   },
 
   data() {
     return {
-      therapy: {},
+      routine: {},
       name: "",
       description: "",
       is_model: false,
