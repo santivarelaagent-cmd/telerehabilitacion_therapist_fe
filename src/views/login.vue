@@ -61,6 +61,7 @@ export default {
             });
           });
           if (groups.includes("Admin") || groups.includes("Therapist")) {
+            storage.set("user", JSON.stringify(response.data.user))
             storage.setToken(response.data.access_token);
             storage.set("groups", JSON.stringify(groups));
             storage.set("permissions", JSON.stringify(permissions));

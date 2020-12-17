@@ -31,12 +31,22 @@
         <run class="sidebar__item--icon" />
         <span class="sidebar__item--text" v-show="open">Ejercicios</span>
       </li>
+      <li
+        :class="{
+          sidebar__item: true,
+          sidebar__item__active: activeRoute.patients,
+        }"
+        @click="() => goTo('/patients')"
+      >
+        <Account class="sidebar__item--icon" />
+        <span class="sidebar__item--text" v-show="open">Pacientes</span>
+      </li>
     </ul>
   </div>
 </template>
 
 <script>
-import { HospitalBox, ClipboardList, Run } from "mdue";
+import { HospitalBox, ClipboardList, Run, Account } from "mdue";
 export default {
   name: "Sidebar",
   props: ["open"],
@@ -44,6 +54,7 @@ export default {
     HospitalBox,
     ClipboardList,
     Run,
+    Account,
   },
   methods: {
     goTo(path) {
@@ -67,6 +78,8 @@ export default {
         this.activateRoute("routines");
       } else if (this.$route.path.startsWith("/exercises")) {
         this.activateRoute("exercises");
+      } else if (this.$route.path.startsWith("/patients")) {
+        this.activateRoute("patients");
       } else {
         this.activateRoute();
       }
@@ -86,6 +99,7 @@ export default {
         therapies: false,
         routines: false,
         exercises: false,
+        patients: false,
       },
     };
   },

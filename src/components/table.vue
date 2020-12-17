@@ -12,6 +12,9 @@
     <div class="table__loading" v-if="loading">
       <span class="dark-text regular-font">Cargando...</span>
     </div>
+    <div class="table__loading" v-if="table_data.length === 0">
+      <span class="dark-text regular-font">Usted no posee pacientes</span>
+    </div>
     <div class="table__data" v-if="!loading">
       <div
         class="table__data__row light-bg"
@@ -65,6 +68,7 @@
 <script>
 import Http from "../lib/http";
 import { LeadPencil, DeleteEmpty, EyePlus } from "mdue";
+import { get } from "simple-object-query";
 
 export default {
   name: "Table",
@@ -95,11 +99,21 @@ export default {
         console.error("Error on fetch");
         return;
       }
-      response.data.results
-        .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
-        .forEach((row) =>
-          this.table_data.push(this.columns.map((column) => row[column.query]))
-        );
+      console.log(response.data)
+      if (Object.prototype.hasOwnProperty.call(response.data, "results")) {
+        console.log('herer')
+        response.data.results
+          .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
+          .forEach((row) =>
+            this.table_data.push(this.columns.map((column) => get(row, column.query)))
+          );
+      } else {
+        response.data
+          .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
+          .forEach((row) =>
+            this.table_data.push(this.columns.map((column) => get(row, column.query)))
+          );
+      }
     },
   },
 
