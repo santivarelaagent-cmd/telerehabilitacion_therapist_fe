@@ -27,7 +27,7 @@ class Http {
         requestData.body = JSON.stringify(body);
       }
       let request = await fetch(url, requestData);
-      if (method === "GET") {
+      if (method === "GET" || url.includes("login")) {
         let json = await request.json();
         return {
           data: json,

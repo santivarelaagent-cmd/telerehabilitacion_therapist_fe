@@ -2,7 +2,7 @@
   <div class="main-container">
     <div class="header">
       <h2 class="header__title dark-text regular-font">{{ title }}</h2>
-      <button class="btn btn-success" @click="() => $emit('go-to-create')">
+      <button class="btn btn-success" @click="() => $emit('go-to-create')" v-if="has_new_var">
         <plus class="light-text" />
         <span class="btn__label font-family light-font light-text"
           >Añadir elemento</span
@@ -26,10 +26,13 @@ import { Plus } from "mdue";
 import Table from "./table";
 export default {
   name: "ListModel",
-  props: ["title", "table_info"],
+  props: ["title", "has_new", "table_info"],
 
   beforeMount() {
     const errorMessages = [];
+    if (typeof this.has_new === 'undefined') this.has_new_var=true;
+    else this.has_new_var=this.has_new;
+    console.log(this.has_new_var)
     if (!this.title || typeof this.title !== "string") {
       errorMessages.push(
         "You have to pass a valid title! (It most be a string)"
@@ -119,6 +122,12 @@ export default {
       this.$emit("go-to-detail", id);
     },
   },
+
+  data() {
+    return {
+      has_new_var: true,
+    }
+  }
 };
 </script>
 
