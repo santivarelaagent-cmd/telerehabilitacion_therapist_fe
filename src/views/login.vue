@@ -45,25 +45,6 @@ export default {
         username: this.username,
         password: this.password,
       });
-<<<<<<< HEAD
-      if (response.status === 201) {
-        const storage = new Storage();
-        const groups = [];
-        const permissions = [];
-        const {groups: _, ...user} = response.data.user;
-        storage.set('user', JSON.stringify(user));
-        response.data.user.groups.forEach((group) => {
-          groups.push(group.name);
-          group.permissions.forEach((permission) => {
-            permissions.push(permission.codename);
-          });
-        });
-        if (groups.includes("Admin") || groups.includes("Therapist")) {
-          storage.setToken(response.data.access_token);
-          storage.set("groups", JSON.stringify(groups));
-          storage.set("permissions", JSON.stringify(permissions));
-          this.$router.push("/");
-=======
       if (response.error) {
         this.errorMsg = "Hubo un error accediendo al servidor. Inténtelo más tarde o comuníquese con el Administrador";
         this.hasError = true;
@@ -95,7 +76,6 @@ export default {
           this.errorMsg = "Usuario y contraseña no válidas.";
           this.hasError = true;
           this.loading = false;
->>>>>>> feature/login-loader
         } else {
           this.errorMsg = "Error interno. Inténtelo más tarde.";
           this.hasError = true;

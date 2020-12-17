@@ -27,7 +27,6 @@ class Http {
         requestData.body = JSON.stringify(body);
       }
       let request = await fetch(url, requestData);
-<<<<<<< HEAD
       if (method === "GET") {
         let json = await request.json();
         return {
@@ -39,14 +38,6 @@ class Http {
           request,
         };
       }
-=======
-      let json = await request.json();
-      return {
-        error: false,
-        data: json,
-        status: request.status,
-      };
->>>>>>> feature/login-loader
     } catch (error) {
       console.error(
         `Http ${method} method on ${url} failed with error ${error}`
