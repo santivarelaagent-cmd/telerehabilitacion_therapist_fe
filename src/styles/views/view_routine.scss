@@ -82,5 +82,14 @@
 .patients-table {
 	display: grid;
 	grid-template-columns: 1fr 1fr 1fr;
+  margin-bottom: 20px;
+  span {
+    padding-left: 10px;
+  }
+}
+.diff-table {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr 1fr;
 	margin-bottom: 20px;
 }
+
