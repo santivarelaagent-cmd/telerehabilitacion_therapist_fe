@@ -12,31 +12,33 @@
         <h3 class="regular-font dark-text">Video subido:</h3>
         <video :src=" `http://localhost/media/${ exercise.video }` " controls></video>
         <hr>
-        <div class="patients-table">
-          <span class="regular-font">Punto</span>
-          <span class="regular-font">Ángulo mínimo</span>
-          <span class="regular-font">Ángulo máximo</span>
-          <template v-for="point in tracked_points" :key="point.id">
-            <span class="light-font">{{point.verbose}}</span>
-            <span class="light-font">{{parseFloat(point.min_angle).toFixed(2)}}</span>
-            <span class="light-font">{{parseFloat(point.max_angle).toFixed(2)}}</span>
-          </template>
-        </div> 
-        <hr>
-        <div class="diff-table">
-          <span class="regular-font">Nombre</span>
-          <span class="regular-font">Punto seguido</span>
-          <span class="regular-font">Ángulo mínimo</span>
-          <span class="regular-font">Ángulo máximo</span>
-          <template v-for="diff in difficulties" :key="diff.name">
-            <template v-for="(range, index) in diff.ranges" :key="index">
-              <span class="light-font">{{index === 0 ? diff.name : ''}}</span>
-              <span class="light-font">{{range.point_tracked.skeleton_point.verbose}}</span>
-              <span class="light-font">{{parseFloat(range.min_angle).toFixed(2)}}</span>
-              <span class="light-font">{{parseFloat(range.max_angle).toFixed(2)}}</span>
+        <template v-if="exercise.status=== 'Video procesado'">
+          <div class="patients-table">
+            <span class="regular-font">Punto</span>
+            <span class="regular-font">Ángulo mínimo</span>
+            <span class="regular-font">Ángulo máximo</span>
+            <template v-for="point in tracked_points" :key="point.id">
+              <span class="light-font">{{point.verbose}}</span>
+              <span class="light-font">{{parseFloat(point.min_angle).toFixed(2)}}</span>
+              <span class="light-font">{{parseFloat(point.max_angle).toFixed(2)}}</span>
             </template>
-          </template>
-        </div> 
+          </div> 
+          <hr>
+          <div class="diff-table">
+            <span class="regular-font">Nombre</span>
+            <span class="regular-font">Punto seguido</span>
+            <span class="regular-font">Ángulo mínimo</span>
+            <span class="regular-font">Ángulo máximo</span>
+            <template v-for="diff in difficulties" :key="diff.name">
+              <template v-for="(range, index) in diff.ranges" :key="index">
+                <span class="light-font">{{index === 0 ? diff.name : ''}}</span>
+                <span class="light-font">{{range.point_tracked.skeleton_point.verbose}}</span>
+                <span class="light-font">{{parseFloat(range.min_angle).toFixed(2)}}</span>
+                <span class="light-font">{{parseFloat(range.max_angle).toFixed(2)}}</span>
+              </template>
+            </template>
+          </div> 
+        </template>
       </div>
     </div>
     <div class="actions-container">
