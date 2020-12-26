@@ -2,6 +2,7 @@ import { createWebHistory, createRouter } from "vue-router";
 import Login from "@/views/login";
 import Home from "@/views/signedIn/home";
 import Profile from "@/views/signedIn/profile.vue";
+import ChangePassword from "@/views/signedIn/change-password.vue";
 import Therapies from "@/views/signedIn/therapies/therapies";
 import ViewTherapy from "@/views/signedIn/therapies/view_therapy.vue";
 import EnrollPatient from "@/views/signedIn/therapies/enroll-patient.vue";
@@ -52,6 +53,12 @@ const routes = [
         path: "profile",
         name: "profile",
         component: Profile,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "profile/change-password",
+        name: "ChangePassword",
+        component: ChangePassword,
         meta: { requiresAuth: true },
       },
       {

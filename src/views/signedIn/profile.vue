@@ -8,15 +8,25 @@
       <p class="dark-text regular-font"><span class="bold-font">Correo electrónico:</span> {{ user.username}}</p>
       <p class="dark-text regular-font"><span class="bold-font">Nombre de usuario:</span> {{ user.username}}</p>
     </div>
+    <div class="actions">
+      <button class="btn btn-lg btn-dark" v-on:click="() => $router.push({name: 'ChangePassword'})" >
+        <KeyChange />
+        <span>Cambiar contraseña</span>
+      </button>
+    </div>
   </div>
 </template>
 
 <script>
 import Storage from "@/lib/storage";
+import { KeyChange } from "mdue";
 export default {
   name: 'Profile',
   beforeMount() {
     this.user = JSON.parse(localStorage.getItem('user'))
+  },
+  components: {
+    KeyChange
   },
   data() {
     return {
@@ -41,5 +51,10 @@ export default {
 }
 .header__title {
   margin: 0;
+}
+.actions {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 </style>

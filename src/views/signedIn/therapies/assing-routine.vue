@@ -2,7 +2,7 @@
   <div class="therapies">
     <div class="header">
       <h2 class="header__title dark-text regular-font">
-        Editando la terapia
+        Asignando rutina en 
         <span class="light-italic-font">{{ therapy.name }}</span>
       </h2>
     </div>
@@ -38,6 +38,15 @@
           id="start_time"
           v-model="start_time"
         />
+        <hr>
+        <h4 class="regular-font dark-text">Dificultades de los ejercicios</h4>
+        <template v-for="exercise in routine_exercises" :key="exercise.id">
+          <p class="regular-font">Dificultad para el ejercicio <span class="light-italic-font">{{ exercise.name }}</span></p>
+          <select @change="e => selectedDiff(e, exercise)">
+            <option disabled selected value></option>
+            <option v-for="diff in exercise.difficulties" :value="diff.id" :key="diff.id">{{ diff.name }}</option>
+          </select>
+        </template>
         <button
           class="btn btn-success"
           style="height: 30px; margin: 30px"
@@ -126,12 +135,32 @@ export default {
         }
       });
     },
+    selectedDiff(event, exercise) {
+      const idx = this.exercises_difficulties.findIndex(diff => diff.exercise_id = exercise.id)
+      if (idx !== -1) {
+        this.exercises_difficulties[idx].diff = event.target.value
+      } else {
+        this.exercises_difficulties.push({
+          exercise_id: exercise.id,
+          diff: parseInt(event.target.value)
+        })
+      }
+      console.log(this.exercises_difficulties)
+    }
+  },
+  watch: {
+    routine: function(id) {
+      const routine_obj = this.therapy_routines.find(routine => routine.id === id)
+      this.routine_exercises = routine_obj.exercises;
+    }
   },
   data() {
     return {
       therapy: {},
       therapy_patients: [],
       therapy_routines: [],
+      routine_exercises: [],
+      exercises_difficulties: [],
       patient: '',
       routine: '',
       start_time: '',
