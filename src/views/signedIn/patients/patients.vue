@@ -43,8 +43,8 @@ export default {
     goToUpdate(therapy_id) {
       this.$router.push({ name: 'edit_therapy', params: { therapy_id } });
     },
-    goToDetail(therapy_id) {
-      this.$router.push({ name: 'view_therapy', params: { therapy_id } });
+    goToDetail(patient_id) {
+      this.$router.push({ name: 'view_patient', params: { patient_id } });
     }
   },
   data() {

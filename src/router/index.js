@@ -18,6 +18,7 @@ import ViewExercise from "@/views/signedIn/exercises/view_exercise.vue";
 import EditExercise from "@/views/signedIn/exercises/edit_exercise";
 import NewDifficulty from "@/views/signedIn/exercises/new-difficulty.vue";
 import Patients from "@/views/signedIn/patients/patients.vue";
+import ViewPatients from "@/views/signedIn/patients/view_patients.vue";
 import SignedIn from "@/views/signedIn/signedIn";
 
 const routes = [
@@ -147,6 +148,12 @@ const routes = [
         path: "patients",
         name: "patients",
         component: Patients,
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "patients/:patient_id",
+        name: "view_patient",
+        component: ViewPatients,
         meta: { requiresAuth: true },
       },
     ],

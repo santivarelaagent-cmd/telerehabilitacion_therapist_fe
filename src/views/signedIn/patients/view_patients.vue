@@ -1,11 +1,12 @@
 <template>
   <div class="therapies">
     <h2 class="light-font dark-text">
-      Ejercicio <span class="light-italic-font">{{ exercise.name }}</span>
+      Paciente <span class="light-italic-font">{{ patient_name }}</span>
     </h2>
-    <h3 class="regular-font dark-text">Descripción:</h3>
-    <p class="light-font dark-text">{{ exercise.description }}</p>
-    <div class="video-container">
+    
+    <h3 class="regular-font dark-text">Terapeuta:</h3>
+    <p class="light-font dark-text">{{ therapist_name }}</p>
+    <!-- <div class="video-container">
       <div class="video-wrapper">
         <h3 class="regular-font dark-text">Estado del video de ayuda:</h3>
         <p class="light-font dark-text">{{ exercise.status }}</p>
@@ -52,72 +53,40 @@
           <span>Asignar nueva dificultad al ejercicio</span>
         </button>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 
 <script>
 import Http from '@/lib/http';
 import '@/styles/views/view_routine.scss';
-import { VideoAccount, RunFast } from "mdue";
 
 export default {
-  name: 'ViewExercise',
+  name: 'ViewPatient',
   async beforeMount() {
-    await this.getExercise();
-  },
-  components: {
-    VideoAccount,
-    RunFast
+    await this.getPatient();
   },
   methods: {
-    async getExercise() {
+    async getPatient() {
       const http = new Http();
       const response = await http.authGet(
-        `/exercises/${this.$route.params.exercise_id}`
+        `/therapist_patient?patient_id=${this.$route.params.patient_id}`
       );
       if (response.status !== 404) {
-        this.exercise = response.data;
-        this.routine = this.exercise.routine_id;
-        this.name = this.exercise.name;
-        this.description = this.exercise.description;
-        this.order = this.exercise.order;
-        this.status = this.exercise.status;
-        if (this.status === "Video procesado") {
-          await this.getPointsTracked();
-          await this.getDifficulties();
-        }
+        this.patient = response.data;
+        this.patient_name = `${this.patient.patient.user.first_name} ${this.patient.patient.user.last_name}`;
+        this.therapist_name = `${this.patient.therapist.user.first_name} ${this.patient.therapist.user.last_name}`;
+        console.log(this.patient_name)
       } else {
         console.log("TODO: route to 404");
       }
     },
-    async getPointsTracked() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/exercises/${this.exercise.id}/points_tracked/`
-      );
-      if (response.status !== 200) {
-        console.error("Error on fetch");
-        return;
-      }
-      this.tracked_points = response.data;
-    },
-    async getDifficulties() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/exercises/${this.exercise.id}/difficulties/`
-      );
-      if (response.status !== 200) {
-        console.error("Error on fetch");
-        return;
-      }
-      this.difficulties = response.data;
-    },
   },
   data() {
     return {
-      exercise: {},
-      tracked_points: [],
+      patient: {},
+      patient_name: '',
+      therapist_name: '',
       difficulties: []
     };
   },
