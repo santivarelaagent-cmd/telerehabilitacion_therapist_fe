@@ -13,7 +13,7 @@
       <span class="dark-text regular-font">Cargando...</span>
     </div>
     <div class="table__loading" v-if="table_data.length === 0">
-      <span class="dark-text regular-font">Usted no posee pacientes</span>
+      <span class="dark-text regular-font">No hay información</span>
     </div>
     <div class="table__data" v-if="!loading">
       <div
@@ -126,7 +126,8 @@ export default {
       );
       return;
     }
-    this.has_actions = !!this.actions;
+    this.has_actions = this.actions.length !== 0;
+    console.log("this.has_actions", this.has_actions, this.actions)
     this.mapHeader();
     this.callAPI();
   },

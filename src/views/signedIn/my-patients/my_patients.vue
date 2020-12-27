@@ -1,6 +1,6 @@
 <template>
   <ListModel
-    title="Pacientes"
+    title="Mis pacientes"
     :table_info="{
       columns: [
         { query: 'id', verbose: 'ID' },

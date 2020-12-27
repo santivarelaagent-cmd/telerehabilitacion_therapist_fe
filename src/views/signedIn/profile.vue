@@ -5,7 +5,7 @@
     </div>
     <div class="body">
       <p class="dark-text regular-font"><span class="bold-font">Nombre:</span> {{ `${user.first_name} ${user.last_name}` }}</p>
-      <p class="dark-text regular-font"><span class="bold-font">Correo electrónico:</span> {{ user.username}}</p>
+      <p class="dark-text regular-font"><span class="bold-font">Correo electrónico:</span> {{ user.email}}</p>
       <p class="dark-text regular-font"><span class="bold-font">Nombre de usuario:</span> {{ user.username}}</p>
     </div>
     <div class="actions">

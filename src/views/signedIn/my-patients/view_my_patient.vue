@@ -72,6 +72,7 @@ export default {
       const response = await http.authGet(
         `/therapist_patient?patient_id=${this.$route.params.patient_id}`
       );
+      console.log(response)
       if (response.status !== 404) {
         this.patient = response.data;
         this.patient_name = `${this.patient.patient.user.first_name} ${this.patient.patient.user.last_name}`;

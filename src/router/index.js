@@ -18,8 +18,10 @@ import NewExercise from "@/views/signedIn/exercises/new_exercise";
 import ViewExercise from "@/views/signedIn/exercises/view_exercise.vue";
 import EditExercise from "@/views/signedIn/exercises/edit_exercise";
 import NewDifficulty from "@/views/signedIn/exercises/new-difficulty.vue";
-import Patients from "@/views/signedIn/patients/patients.vue";
-import ViewPatients from "@/views/signedIn/patients/view_patients.vue";
+import MyPatients from "@/views/signedIn/my-patients/my_patients.vue";
+import ViewMyPatients from "@/views/signedIn/my-patients/view_my_patient.vue";
+import Therapists from "@/views/signedIn/therapists/therapists.vue";
+import NewTherapist from "../views/signedIn/therapists/new_therapist.vue";
 import SignedIn from "@/views/signedIn/signedIn";
 
 const routes = [
@@ -152,16 +154,28 @@ const routes = [
         meta: { requiresAuth: true },
       },
       {
-        path: "patients",
-        name: "patients",
-        component: Patients,
-        meta: { requiresAuth: true },
+        path: "my-patients",
+        name: "my-patients",
+        component: MyPatients,
+        meta: { requiresAuth: true, requestTherapist: true },
       },
       {
-        path: "patients/:patient_id",
+        path: "my-patients/:patient_id",
         name: "view_patient",
-        component: ViewPatients,
-        meta: { requiresAuth: true },
+        component: ViewMyPatients,
+        meta: { requiresAuth: true, requestTherapist: true },
+      },
+      {
+        path: "therapists",
+        name: "therapists",
+        component: Therapists,
+        meta: { requiresAuth: true, requestAdmin: true },
+      },
+      {
+        path: "therapists/new",
+        name: "new-therapists",
+        component: NewTherapist,
+        meta: { requiresAuth: true, requestAdmin: true },
       },
     ],
   },
@@ -175,14 +189,40 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
     if (localStorage.getItem("access_token")) {
-      next();
+      const groups = JSON.parse(localStorage.getItem("groups"));
+      if (to.meta.requestTherapist) {
+        if (groups.includes("Therapist")) {
+          next();
+          return;
+        } else {
+          next({
+            path: "/",
+          });
+          return;
+        }
+      } else if (to.meta.requestAdmin) {
+        if (groups.includes("Admin")) {
+          next();
+          return;
+        } else {
+          next({
+            path: "/",
+          });
+          return;
+        }
+      } else {
+        next();
+        return;
+      }
     } else {
       next({
         name: "login",
       });
+      return;
     }
   } else {
     next();
+    return;
   }
 });
 

@@ -68,9 +68,10 @@ export default {
           "The table_info object have to have an array of actions"
         );
       } else if (
+        this.table_info.actions !== [] &&
         !this.table_info.actions
           .map((action) => ["detail", "update", "delete"].includes(action))
-          .reduce((acc, curr) => acc && curr)
+          .reduce((acc, curr) => acc && curr, true)
       ) {
         errorMessages.push(
           "The actions list have to be one of: [detail, update, delete]"

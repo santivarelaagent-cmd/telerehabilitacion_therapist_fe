@@ -34,19 +34,31 @@
       <li
         :class="{
           sidebar__item: true,
-          sidebar__item__active: activeRoute.patients,
+          sidebar__item__active: activeRoute.my_patients,
         }"
-        @click="() => goTo('/patients')"
+        @click="() => goTo('/my-patients')"
+        v-show="groups.includes('Therapist')"
       >
-        <Account class="sidebar__item--icon" />
-        <span class="sidebar__item--text" v-show="open">Pacientes</span>
+        <AccountChild class="sidebar__item--icon" />
+        <span class="sidebar__item--text" v-show="open">Mis pacientes</span>
+      </li>
+      <li
+        :class="{
+          sidebar__item: true,
+          sidebar__item__active: activeRoute.therapists,
+        }"
+        @click="() => goTo('/therapists')"
+        v-show="groups.includes('Admin')"
+      >
+        <Doctor class="sidebar__item--icon" />
+        <span class="sidebar__item--text" v-show="open">Terapeutas</span>
       </li>
     </ul>
   </div>
 </template>
 
 <script>
-import { HospitalBox, ClipboardList, Run, Account } from "mdue";
+import { HospitalBox, ClipboardList, Run, AccountChild, Doctor } from "mdue";
 export default {
   name: "Sidebar",
   props: ["open"],
@@ -54,7 +66,8 @@ export default {
     HospitalBox,
     ClipboardList,
     Run,
-    Account,
+    AccountChild,
+    Doctor,
   },
   methods: {
     goTo(path) {
@@ -78,8 +91,8 @@ export default {
         this.activateRoute("routines");
       } else if (this.$route.path.startsWith("/exercises")) {
         this.activateRoute("exercises");
-      } else if (this.$route.path.startsWith("/patients")) {
-        this.activateRoute("patients");
+      } else if (this.$route.path.startsWith("/my-patients")) {
+        this.activateRoute("my_patients");
       } else {
         this.activateRoute();
       }
@@ -87,6 +100,7 @@ export default {
   },
   beforeMount() {
     this.setActiveRoute();
+    this.groups = JSON.parse(localStorage.getItem('groups'))
   },
   watch: {
     $route() {
@@ -99,8 +113,10 @@ export default {
         therapies: false,
         routines: false,
         exercises: false,
-        patients: false,
+        my_patients: false,
+        therapists: false,
       },
+      groups: [],
     };
   },
 };
@@ -128,6 +144,7 @@ export default {
 }
 .sidebar__item--text {
   padding-left: 10px;
+  white-space: nowrap;
 }
 .sidebar__item__active {
   border-left: 2px solid $primary;
