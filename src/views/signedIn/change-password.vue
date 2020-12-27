@@ -91,7 +91,12 @@ export default {
           this.error_msg = `La petición falló con estado ${response.status}`;
         }
       } else {
-        this.error_msg = "Revisa el formulario";
+        if (this.new_password !== this.new_password_again) {
+          this.error_msg = "Las contraseñas nuevas no coinciden";
+        } else if (this.new_password.length < 8) {
+          this.error_msg = "La nueva contraseña debe tener al menos 8 caracteres";
+          this.new_password_valid = false;
+        }
       }
       this.loading = false;
     },
