@@ -1,19 +1,18 @@
 <template>
   <ListModel
-    title="Pacientes"
+    title="Administradores"
     :table_info="{
       columns: [
         { query: 'id', verbose: 'ID' },
-        { query: 'patient.user.username', verbose: 'Paciente' },
-        { query: 'therapist.user.username', verbose: 'Terapeuta' },
-        { query: 'therapy.name', verbose: 'Terapia' },
+        { query: 'user.username', verbose: 'Nombre de usuario' },
+        { query: 'user.first_name', verbose: 'Nombre' },
+        { query: 'user.email', verbose: 'Correo electrónico' },
       ],
-      actions: ['detail'],
-      api_endpoint: `/therapist_patient?therapist_id=${therapist_id}`,
+      api_endpoint: '/admins',
+      actions: [],
       sorting_column: 'id'
     }"
-    :has_new="false"
-    @go-to-create="$router.push({ name: 'new_therapy' })"
+    @go-to-create="$router.push({ name: 'new-admin' })"
     @go-to-update="goToUpdate"
     @go-to-delete="goToDelete"
     @go-to-detail="goToDetail"

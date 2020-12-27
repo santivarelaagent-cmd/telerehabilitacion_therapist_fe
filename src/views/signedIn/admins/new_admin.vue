@@ -1,7 +1,7 @@
 <template>
   <div class="therapies">
     <div class="header">
-      <h2 class="header__title dark-text regular-font">Nuevo terapeuta</h2>
+      <h2 class="header__title dark-text regular-font">Nuevo administrador</h2>
     </div>
     <div class="form-wrapper">
       <form class="create-therapy" @submit.prevent="saveTherapist">
@@ -17,7 +17,7 @@
             name="first_name"
             id="first_name"
             :class="{ 'light-font': true, 'has-error': !first_name_valid }"
-            placeholder="Nombre del terapeuta"
+            placeholder="Nombre del administrador"
             v-model="first_name"
           />
         </div>
@@ -30,7 +30,7 @@
             name="last_name"
             id="last_name"
             :class="{ 'light-font': true, 'has-error': !last_name_valid }"
-            placeholder="Apellidos del terapeuta"
+            placeholder="Apellidos del administrador"
             v-model="last_name"
           />
         </div>
@@ -43,7 +43,7 @@
             name="email"
             id="email"
             :class="{ 'light-font': true, 'has-error': !email_valid }"
-            placeholder="Correo electrónico del terapeuta"
+            placeholder="Correo electrónico del administrador"
             v-model="email"
           />
         </div>
@@ -56,7 +56,7 @@
             name="username"
             id="username"
             :class="{ 'light-font': true, 'has-error': !username_valid }"
-            placeholder="Nombre de usuario único del terapeuta"
+            placeholder="Nombre de usuario único del administrador"
             v-model="username"
           />
         </div>

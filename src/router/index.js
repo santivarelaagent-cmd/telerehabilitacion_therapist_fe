@@ -24,6 +24,8 @@ import Therapists from "@/views/signedIn/therapists/therapists.vue";
 import NewTherapist from "@/views/signedIn/therapists/new_therapist.vue";
 import Patients from "@/views/signedIn/patients/patients.vue";
 import NewPatient from "@/views/signedIn/patients/new_patient.vue";
+import Admins from "@/views/signedIn/admins/admins.vue";
+import NewAdmin from "@/views/signedIn/admins/new_admin.vue";
 import SignedIn from "@/views/signedIn/signedIn";
 
 const routes = [
@@ -189,6 +191,18 @@ const routes = [
         path: "patients/new",
         name: "new-patient",
         component: NewPatient,
+        meta: { requiresAuth: true, requestAdmin: true },
+      },
+      {
+        path: "admins",
+        name: "admins",
+        component: Admins,
+        meta: { requiresAuth: true, requestAdmin: true },
+      },
+      {
+        path: "admins/new",
+        name: "new-admin",
+        component: NewAdmin,
         meta: { requiresAuth: true, requestAdmin: true },
       },
     ],
