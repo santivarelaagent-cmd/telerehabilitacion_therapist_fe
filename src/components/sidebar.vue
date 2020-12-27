@@ -47,6 +47,17 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.therapists,
         }"
+        @click="() => goTo('/admins')"
+        v-show="groups.includes('Admin')"
+      >
+        <PoliceBadgeOutline class="sidebar__item--icon" />
+        <span class="sidebar__item--text" v-show="open">Administradores</span>
+      </li>
+      <li
+        :class="{
+          sidebar__item: true,
+          sidebar__item__active: activeRoute.therapists,
+        }"
         @click="() => goTo('/therapists')"
         v-show="groups.includes('Admin')"
       >
@@ -69,7 +80,7 @@
 </template>
 
 <script>
-import { HospitalBox, ClipboardList, Run, AccountChild, Doctor, Account } from "mdue";
+import { HospitalBox, ClipboardList, Run, AccountChild, Doctor, Account, PoliceBadgeOutline } from "mdue";
 export default {
   name: "Sidebar",
   props: ["open"],
@@ -80,6 +91,7 @@ export default {
     AccountChild,
     Doctor,
     Account,
+    PoliceBadgeOutline,
   },
   methods: {
     goTo(path) {
