@@ -9,10 +9,10 @@
       <div class="video-wrapper">
         <h3 class="regular-font dark-text">Estado del video de ayuda:</h3>
         <p class="light-font dark-text">{{ exercise.status }}</p>
-        <h3 class="regular-font dark-text">Video subido:</h3>
-        <video :src=" `http://localhost/media/${ exercise.video }` " controls></video>
-        <hr>
         <template v-if="exercise.status=== 'Video procesado'">
+          <h3 class="regular-font dark-text">Video subido:</h3>
+          <video :src=" `http://localhost/media/${ exercise.video }` " controls></video>
+          <hr>
           <div class="patients-table">
             <span class="regular-font">Punto</span>
             <span class="regular-font">Ángulo mínimo</span>

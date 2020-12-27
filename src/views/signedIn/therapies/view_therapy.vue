@@ -101,7 +101,7 @@ export default {
 };
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .patients-container {
   width: 100%;
   display: flex;
@@ -116,6 +116,11 @@ export default {
   h3 {
     margin-top: 0;
   }
+}
+.patients-table {
+	display: grid;
+	grid-template-columns: 1fr 1fr !important;
+	margin-bottom: 20px;
 }
 .actions-container {
   width: 100%;

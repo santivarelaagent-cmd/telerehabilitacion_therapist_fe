@@ -9,6 +9,9 @@
     <div class="form-wrapper">
       <div class="form-container">
         <h3 class="regular-font dark-text">Asignar rutina a paciente</h3>
+        <div class="danger-bg assign__form--error" v-show="hasError">
+          <span class="white-text light-font">{{ errorMsg }}</span>
+        </div>
         <p class="regular-font">Paciente</p>
         <select name="patient" id="patient" v-model="patient">
           <option
@@ -39,7 +42,7 @@
           v-model="start_time"
         />
         <hr>
-        <h4 class="regular-font dark-text">Dificultades de los ejercicios</h4>
+        <h4 v-if="routine_exercises.length !== 0" class="regular-font dark-text">Dificultades de los ejercicios</h4>
         <template v-for="exercise in routine_exercises" :key="exercise.id">
           <p class="regular-font">Dificultad para el ejercicio <span class="light-italic-font">{{ exercise.name }}</span></p>
           <select @change="e => selectedDiff(e, exercise)">
@@ -105,6 +108,27 @@ export default {
       }
     },    
     async schedulePatient() {
+      if (this.patient === '') {
+        this.hasError = true;
+        this.errorMsg = "Debes seleccionar un paciente"
+        return
+      }
+      if (this.routine === '') {
+        this.hasError = true;
+        this.errorMsg = "Debes seleccionar una rutina"
+        return
+      }
+      if (this.start_time === '') {
+        this.hasError = true;
+        this.errorMsg = "Debes seleccionar una fecha y hora para que el usuario desarrolle la rutina"
+        return
+      }
+      if (this.routine_exercises.length !== this.exercises_difficulties.length) {
+        console.log(this.routine_exercises.slice().length, this.exercises_difficulties.slice().length)
+        this.hasError = true;
+        this.errorMsg = "Debes seleccionar una dificultad para cada uno de los ejercicios"
+        return;
+      }
       const http = new Http();
       const date = new Date(this.start_time);
       const response = http.authPost('/scheduled_training', {
@@ -127,6 +151,7 @@ export default {
             ? '0' + date.getSeconds()
             : '' + date.getSeconds()
         }`,
+        difficulties: this.exercises_difficulties
       });
       this.$router.push({
         name: 'view_therapy',
@@ -136,9 +161,11 @@ export default {
       });
     },
     selectedDiff(event, exercise) {
-      const idx = this.exercises_difficulties.findIndex(diff => diff.exercise_id = exercise.id)
+      console.log(exercise.id)
+      const idx = this.exercises_difficulties.findIndex(diff => diff.exercise_id === exercise.id)
+      console.log("idx", idx)
       if (idx !== -1) {
-        this.exercises_difficulties[idx].diff = event.target.value
+        this.exercises_difficulties[idx].diff = parseInt(event.target.value)
       } else {
         this.exercises_difficulties.push({
           exercise_id: exercise.id,
@@ -152,6 +179,10 @@ export default {
     routine: function(id) {
       const routine_obj = this.therapy_routines.find(routine => routine.id === id)
       this.routine_exercises = routine_obj.exercises;
+      console.log(this.routine_exercises)
+      this.exercises_difficulties = this.routine_exercises.map(obj => ({
+        exercise_id: obj.id
+      }))
     }
   },
   data() {
@@ -164,12 +195,14 @@ export default {
       patient: '',
       routine: '',
       start_time: '',
+      hasError: false,
+      errorMsg: '',
     };
   },
 }
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .form-wrapper {
   width: 100%;
   display: flex;
@@ -188,5 +221,14 @@ export default {
   button {
     width: 30%;
   }
+}
+.assign__form--error {
+  margin-bottom: 10px;
+  padding: 5px;
+  padding-left: 10px;
+  border-radius: 30px;
+  border: 0;
+  font-weight: 400;
+  font-size: 0.8em;
 }
 </style>
