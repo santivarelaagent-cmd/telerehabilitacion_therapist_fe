@@ -21,7 +21,9 @@ import NewDifficulty from "@/views/signedIn/exercises/new-difficulty.vue";
 import MyPatients from "@/views/signedIn/my-patients/my_patients.vue";
 import ViewMyPatients from "@/views/signedIn/my-patients/view_my_patient.vue";
 import Therapists from "@/views/signedIn/therapists/therapists.vue";
-import NewTherapist from "../views/signedIn/therapists/new_therapist.vue";
+import NewTherapist from "@/views/signedIn/therapists/new_therapist.vue";
+import Patients from "@/views/signedIn/patients/patients.vue";
+import NewPatient from "@/views/signedIn/patients/new_patient.vue";
 import SignedIn from "@/views/signedIn/signedIn";
 
 const routes = [
@@ -175,6 +177,18 @@ const routes = [
         path: "therapists/new",
         name: "new-therapists",
         component: NewTherapist,
+        meta: { requiresAuth: true, requestAdmin: true },
+      },
+      {
+        path: "patients",
+        name: "patients",
+        component: Patients,
+        meta: { requiresAuth: true, requestAdmin: true },
+      },
+      {
+        path: "patients/new",
+        name: "new-patient",
+        component: NewPatient,
         meta: { requiresAuth: true, requestAdmin: true },
       },
     ],

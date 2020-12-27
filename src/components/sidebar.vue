@@ -53,12 +53,23 @@
         <Doctor class="sidebar__item--icon" />
         <span class="sidebar__item--text" v-show="open">Terapeutas</span>
       </li>
+      <li
+        :class="{
+          sidebar__item: true,
+          sidebar__item__active: activeRoute.patients,
+        }"
+        @click="() => goTo('/patients')"
+        v-show="groups.includes('Admin')"
+      >
+        <Account class="sidebar__item--icon" />
+        <span class="sidebar__item--text" v-show="open">Pacientes</span>
+      </li>
     </ul>
   </div>
 </template>
 
 <script>
-import { HospitalBox, ClipboardList, Run, AccountChild, Doctor } from "mdue";
+import { HospitalBox, ClipboardList, Run, AccountChild, Doctor, Account } from "mdue";
 export default {
   name: "Sidebar",
   props: ["open"],
@@ -68,6 +79,7 @@ export default {
     Run,
     AccountChild,
     Doctor,
+    Account,
   },
   methods: {
     goTo(path) {
@@ -93,6 +105,10 @@ export default {
         this.activateRoute("exercises");
       } else if (this.$route.path.startsWith("/my-patients")) {
         this.activateRoute("my_patients");
+      } else if (this.$route.path.startsWith("/therapists")) {
+        this.activateRoute("therapists");
+      } else if (this.$route.path.startsWith("/patients")) {
+        this.activateRoute("patients");
       } else {
         this.activateRoute();
       }
@@ -115,6 +131,7 @@ export default {
         exercises: false,
         my_patients: false,
         therapists: false,
+        patients: false,
       },
       groups: [],
     };
