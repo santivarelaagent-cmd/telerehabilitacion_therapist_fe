@@ -20,6 +20,8 @@ import EditExercise from "@/views/signedIn/exercises/edit_exercise";
 import NewDifficulty from "@/views/signedIn/exercises/new-difficulty.vue";
 import MyPatients from "@/views/signedIn/my-patients/my_patients.vue";
 import ViewMyPatients from "@/views/signedIn/my-patients/view_my_patient.vue";
+import PatientRoutine from "@/views/signedIn/my-patients/patient_routine.vue";
+import ExerciseResult from "@/views/signedIn/my-patients/exercise_result.vue";
 import Therapists from "@/views/signedIn/therapists/therapists.vue";
 import NewTherapist from "@/views/signedIn/therapists/new_therapist.vue";
 import Patients from "@/views/signedIn/patients/patients.vue";
@@ -167,6 +169,19 @@ const routes = [
         path: "my-patients/:patient_id",
         name: "view_patient",
         component: ViewMyPatients,
+        meta: { requiresAuth: true, requestTherapist: true },
+      },
+      {
+        path: "my-patients/:patient_id/routine/:scheduled_training_id",
+        name: "view_patient_routine",
+        component: PatientRoutine,
+        meta: { requiresAuth: true, requestTherapist: true },
+      },
+      {
+        path:
+          "my-patients/:patient_id/routine/:scheduled_training_id/result/:result_id",
+        name: "view_exercise_result",
+        component: ExerciseResult,
         meta: { requiresAuth: true, requestTherapist: true },
       },
       {
