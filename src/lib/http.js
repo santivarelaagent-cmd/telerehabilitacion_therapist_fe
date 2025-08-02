@@ -2,7 +2,7 @@ import Storage from './storage'
 
 class Http {
   constructor() {
-    this.APIUrl = 'https://telerehabilitacion-be.onrender.com/'
+    this.APIUrl = 'https://telerehabilitacion-be.onrender.com'
     this.storage = new Storage()
 
     if (typeof Http.instance === 'object') {
