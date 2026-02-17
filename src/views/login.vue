@@ -41,6 +41,10 @@ export default {
       this.loading = true;
       this.hasError = false;
       const http = new Http();
+
+      console.log("Password antes de enviar:", this.password);
+      // console.log("Password stringified:", JSON.stringify({p: this.password}));
+
       const response = await http.post("/auth/users/login/", {
         username: this.username,
         password: this.password,
