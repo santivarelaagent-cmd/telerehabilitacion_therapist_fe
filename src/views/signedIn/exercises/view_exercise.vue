@@ -9,7 +9,7 @@
       <div class="video-wrapper">
         <h3 class="regular-font dark-text">Estado del video de ayuda:</h3>
         <p class="light-font dark-text">{{ exercise.status }}</p>
-        <template v-if="exercise.status=== 'Video procesado'">
+        <template v-if="exercise.status=== 'Video procesado' || exercise.status === 'Video en procesamiento'">
           <h3 class="regular-font dark-text">Video subido:</h3>
           <div style="position: relative;">
             <video
@@ -105,13 +105,19 @@ export default {
         `/exercises/${this.$route.params.exercise_id}`
       );
       if (response.status !== 404) {
+        console.log(response.data);
         this.exercise = response.data;
         this.routine = this.exercise.routine_id;
         this.name = this.exercise.name;
         this.description = this.exercise.description;
         this.order = this.exercise.order;
         this.status = this.exercise.status;
-        if (this.status === "Video procesado") {
+        console.log(`Estado del video: ${this.status}`);
+        console.log(`Ejercicio: ${this.exercise}`);
+        console.log(`Video: ${this.exercise.video}`);
+
+        console.log(`Predicado: ${this.status === "Video procesado" || this.status === "Video en procesamiento"}`);
+        if (this.status === "Video procesado" || this.status === "Video en procesamiento") {
           await this.getPointsTracked();
           await this.getDifficulties();
         }
