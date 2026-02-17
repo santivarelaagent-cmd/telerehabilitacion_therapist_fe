@@ -8,8 +8,10 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@vueform/multiselect": "^1.0.2",
     "core-js": "^3.6.5",
+    "firebase": "^12.4.0",
     "mdue": "^0.1.2",
     "simple-object-query": "^1.6.1",
     "telerehabilitation_admin": "file:",

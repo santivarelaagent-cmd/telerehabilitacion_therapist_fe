@@ -3,7 +3,8 @@ import Storage from './storage'
 class Http {
   constructor() {
     // this.APIUrl = 'http://localhost:8000'
-    this.APIUrl = 'https://telerehabilitacion-be.onrender.com'
+    // this.APIUrl = 'https://telerehabilitacion-be.onrender.com'
+    this.APIUrl = process.env.VUE_APP_API_URL_LOCAL
     this.storage = new Storage()
 
     if (typeof Http.instance === 'object') {

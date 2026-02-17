@@ -11,7 +11,22 @@
         <p class="light-font dark-text">{{ exercise.status }}</p>
         <template v-if="exercise.status=== 'Video procesado'">
           <h3 class="regular-font dark-text">Video subido:</h3>
-          <video :src=" `http://localhost/media/${ exercise.video }` " controls></video>
+          <div style="position: relative;">
+            <video
+              ref="video"
+              :src="exercise.video"
+              controls
+              crossorigin="anonymous"
+              @play="startDetection"
+              @pause="stopDetection"
+              @ended="stopDetection"
+              style="width: 100%; display: block; z-index: 1;"
+            ></video>
+            <canvas
+              ref="canvas"
+              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2;"
+            ></canvas>
+          </div>
           <hr>
           <div class="patients-table">
             <span class="regular-font">Punto</span>
@@ -51,6 +66,10 @@
           <RunFast class="action-icon" />
           <span>Asignar nueva dificultad al ejercicio</span>
         </button>
+        <button class="btn btn-dark" v-on:click="sendResults" :disabled="!hasResults">
+          <Upload class="action-icon" />
+          <span>Enviar resultados</span>
+        </button>
       </div>
     </div>
   </div>
@@ -59,16 +78,25 @@
 <script>
 import Http from '@/lib/http';
 import '@/styles/views/view_routine.scss';
-import { VideoAccount, RunFast } from "mdue";
+import { VideoAccount, RunFast, Upload } from "mdue";
+import PoseLandmarkerService from '@/services/poseLandmarkerService';
 
 export default {
   name: 'ViewExercise',
   async beforeMount() {
     await this.getExercise();
+    this.poseService = new PoseLandmarkerService();
+    await this.poseService.initialize();
   },
   components: {
     VideoAccount,
-    RunFast
+    RunFast,
+    Upload
+  },
+  computed: {
+    hasResults() {
+      return Object.keys(this.observed_results).length > 0;
+    }
   },
   methods: {
     async getExercise() {
@@ -101,6 +129,13 @@ export default {
         return;
       }
       this.tracked_points = response.data;
+      // Inicializar estructura de resultados
+      this.tracked_points.forEach(point => {
+        this.observed_results[point.codename] = {
+          min: Infinity,
+          max: -Infinity
+        };
+      });
     },
     async getDifficulties() {
       const http = new Http();
@@ -108,17 +143,101 @@ export default {
         `/exercises/${this.exercise.id}/difficulties/`
       );
       if (response.status !== 200) {
-        console.error("Error on fetch");
+        console.error("Error on fetch difficulties");
         return;
       }
+      console.log("Rango de dificultades: ", response.data);
       this.difficulties = response.data;
     },
+    startDetection() {
+      const video = this.$refs.video;
+      const canvas = this.$refs.canvas;
+
+      if (!video || !canvas) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      this.poseService.createDrawingUtils(canvas.getContext('2d'));
+
+      // Reiniciar resultados al empezar de nuevo si se desea, o acumular
+      // this.resetResults();
+
+      const renderLoop = async () => {
+        if (video.paused || video.ended) return;
+
+        try {
+          await this.poseService.detectForVideo(
+            video,
+            canvas,
+            performance.now(),
+            this.tracked_points,
+            this.updateResults // Callback
+          );
+        } catch (e) {
+          console.error("Deteniendo detección por error:", e);
+          return;
+        }
+
+        requestAnimationFrame(renderLoop);
+      };
+
+      renderLoop();
+    },
+    stopDetection() {
+      // El loop se detiene automáticamente
+    },
+    updateResults(currentAngles) {
+      for (const [codename, angle] of Object.entries(currentAngles)) {
+        if (this.observed_results[codename]) {
+          if (angle < this.observed_results[codename].min) {
+            this.observed_results[codename].min = angle;
+          }
+          if (angle > this.observed_results[codename].max) {
+            this.observed_results[codename].max = angle;
+          }
+        }
+      }
+    },
+    async sendResults() {
+      const resultsPayload = {
+        error: false,
+        results: {
+          points: Object.entries(this.observed_results).map(([center, data]) => ({
+            center: center,
+            max_angle: data.max === -Infinity ? 0 : parseFloat(data.max.toFixed(2)),
+            min_angle: data.min === Infinity ? 0 : parseFloat(data.min.toFixed(2))
+          }))
+        }
+      };
+
+      console.log("Enviando resultados:", resultsPayload);
+
+      const http = new Http();
+      try {
+        const response = await http.authPost(
+          `/exercises/${this.exercise.id}/video_results/`,
+          resultsPayload
+        );
+
+        if (response.status === 200 || response.status === 201) {
+          alert("Resultados enviados correctamente");
+        } else {
+          alert("Error al enviar resultados");
+        }
+      } catch (error) {
+        console.error("Error en la petición:", error);
+        alert("Error de conexión");
+      }
+    }
   },
   data() {
     return {
       exercise: {},
       tracked_points: [],
-      difficulties: []
+      difficulties: [],
+      poseService: null,
+      observed_results: {} // Estructura: { "LEFT_SHOULDER": { min: 10, max: 120 }, ... }
     };
   },
 };

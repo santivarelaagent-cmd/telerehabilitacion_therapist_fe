@@ -103,17 +103,16 @@
             <div>
               <Multiselect
                 class="select light-font"
-                :options="skeleton_points.map(
-                  point => ({
+                :options="
+                  skeleton_points.map((point) => ({
                     value: point.id,
-                    label: point.verbose
-                  })
-                )"
+                    label: point.verbose,
+                  }))
+                "
                 mode="tags"
                 searchable
                 v-model="selected_points"
               >
-              
               </Multiselect>
             </div>
           </div>
@@ -129,61 +128,64 @@
 </template>
 
 <script>
-import { Plus, Cached } from "mdue";
-import Http from "@/lib/http";
-import "@/styles/views/edit_exercise.scss";
+import { Plus, Cached } from 'mdue'
+import Http from '@/lib/http'
+import '@/styles/views/edit_exercise.scss'
 import Multiselect from '@vueform/multiselect'
+import ExerciseService from '@/services/exerciseService'
 export default {
-  name: "EditExercise",
+  name: 'EditExercise',
 
   components: {
     Plus,
     Cached,
-    Multiselect
+    Multiselect,
   },
 
   async beforeMount() {
-    await this.getRoutines();
-    await this.getExercise();
-    await this.getSkeletonPoints();
+    await this.getRoutines()
+    await this.getExercise()
+    await this.getSkeletonPoints()
   },
 
   methods: {
     videoChanged(e) {
-      console.log(e.target.files[0]);
-      this.video = e.target.files[0];
+      console.log(e.target.files[0])
+      this.video = e.target.files[0]
     },
     async getRoutines() {
-      this.loading_routines = true;
-      const http = new Http();
-      const response = await http.authGet("/routines/");
+      this.loading_routines = true
+      const http = new Http()
+      const response = await http.authGet('/routines/')
       if (response.status !== 200) {
-        console.error("Error on fetch");
-        return;
+        console.error('Error on fetch')
+        return
       }
       this.routines = response.data.results.map((row) => ({
         id: row.id,
         name: row.name,
-      }));
-      this.loading_routines = false;
+      }))
+      this.loading_routines = false
     },
     async getExercise() {
-      const http = new Http();
+      const http = new Http()
       const response = await http.authGet(
         `/exercises/${this.$route.params.exercise_id}`
-      );
+      )
       if (response.status !== 404) {
-        this.exercise = response.data;
-        this.routine = this.exercise.routine_id;
-        this.name = this.exercise.name;
-        this.description = this.exercise.description;
-        this.order = this.exercise.order;
-        this.status = this.exercise.status;
-        if (this.status === "Video procesado") {
-          await this.getPointsTracked();
+        console.log(response.data)
+        this.exercise = response.data
+        this.routine = this.exercise.routine_id
+        this.name = this.exercise.name
+        this.description = this.exercise.description
+        this.order = this.exercise.order
+        this.status = this.exercise.status
+        if (this.status === 'Video procesado') {
+          console.log("video procesado")
+          await this.getPointsTracked()
         }
       } else {
-        console.log("TODO: route to 404");
+        console.log('TODO: route to 404')
       }
     },
     formHasChanged() {
@@ -192,87 +194,99 @@ export default {
         this.description !== this.exercise.description ||
         this.routine != this.exercise.routine_id ||
         this.order !== this.exercise.order
-      );
+      )
     },
     async getSkeletonPoints() {
-      const http = new Http();
-      const response = await http.authGet("/skeleton/");
+      console.log('getSkeletonPoints')
+      const http = new Http()
+      const response = await http.authGet('/skeleton/')
       if (response.status !== 200) {
-        console.error("Error on fetch");
-        return;
+        console.error('Error on fetch')
+        return
       }
-      this.skeleton_points = response.data;
+      this.skeleton_points = response.data
     },
     async getPointsTracked() {
-      const http = new Http();
+      console.log('getPointsTracked')
+      const http = new Http()
       const response = await http.authGet(
         `/exercises/${this.exercise.id}/points_tracked/`
-      );
+      )
       if (response.status !== 200) {
-        console.error("Error on fetch");
-        return;
+        console.error('Error on fetch')
+        return
       }
-      this.tracked_points = response.data;
+      this.tracked_points = response.data
     },
     async saveExercise() {
-      this.loading = true;
-      if (this.formHasChanged()) {
-        this.name_valid = this.name !== "";
-        this.description_valid = this.description !== "";
-        this.routine_valid = this.routine !== "";
-        this.order_valid = !!this.order;
-        this.form_valid =
-          this.name_valid &&
-          this.description_valid &&
-          this.routine_valid &&
-          this.order_valid;
-        if (this.form_valid) {
-          const http = new Http();
-          const response = await http.authPut(
-            `/exercises/${this.$route.params.exercise_id}/`,
-            {
-              name: this.name,
-              description: this.description,
-              routine_id: parseInt(this.routine),
-              order: this.order,
-              is_model: this.is_model,
-            }
-          );
-          if (response.status === 201) {
-            this.$router.push({ name: "exercises" });
-          } else {
-            this.error_msg = `La petición falló con estado ${response.status}`;
+      this.loading = true
+      try {
+        if (this.formHasChanged()) {
+          this.name_valid = this.name !== ''
+          this.description_valid = this.description !== ''
+          this.routine_valid = this.routine !== ''
+          this.order_valid = !!this.order
+          this.form_valid =
+            this.name_valid &&
+            this.description_valid &&
+            this.routine_valid &&
+            this.order_valid
+
+          if (!this.form_valid) {
+            this.error_msg = 'Revisa el formulario'
+            this.loading = false
+            return
           }
-        } else {
-          this.error_msg = "Revisa el formulario";
+
+          const meta = {
+            name: this.name,
+            description: this.description,
+            routine_id: parseInt(this.routine),
+            order: this.order,
+            is_model: this.is_model,
+          }
+
+          const result = await ExerciseService.saveExercise({
+            exerciseId: this.$route.params.exercise_id,
+            metadata: meta,
+            useFirebase: true, // cambiar según preferencia
+          })
+
+          if (result.ok) {
+            this.$router.push({ name: 'exercises' })
+          } else {
+            this.error_msg = `Error en ${result.step}`
+          }
+          this.loading = false
+          return
         }
-      } else {
-        console.log("no changes");
-          console.log(this.selected_points);
+        console.log('no changes')
+        console.log(this.selected_points)
 
         if (this.video) {
-          console.log(this.selected_points);
-          console.log(typeof this.selected_points);
-          const points = [];
-          for (let [_, value] of Object.entries(this.selected_points)) {
-            console.log(_, value);
-            points.push(value);
-          }
-          const pointsParsed = points.join(",");
-          if (pointsParsed !== "") {
-            const http = new Http();
-            let form = new FormData();
-            form.append("video", this.video);
-            form.append("points", pointsParsed);
-            const response = await http.authPostFormData(
-              `/exercises/${this.$route.params.exercise_id}/video/`,
-              form
-            );
-            console.log(response);
+          console.log(this.selected_points)
+          console.log(typeof this.selected_points)
+
+          const points = (this.selected_points || [])
+            .map((p) => p.value ?? p)
+            .join(',')
+          const result = await ExerciseService.saveExercise({
+            exerciseId: this.$route.params.exercise_id,
+            file: this.video,
+            points,
+            useFirebase: true,
+            onProgress: (pct) => (this.uploadProgress = pct),
+          })
+          if (!result.ok) {
+            this.error_msg = 'Error al subir el video'
           }
         }
+      } catch (error) {
+        console.error('saveExercise error', error)
+        this.error_msg = 'Error inesperado al guardar el ejercicio'
+      } finally {
+        this.loading = false
       }
-      this.loading = false;
     },
   },
 
@@ -281,19 +295,19 @@ export default {
       exercise: {},
       tracked_points: [],
       form_valid: true,
-      routine: "",
+      routine: '',
       routine_valid: true,
 
-      name: "",
+      name: '',
       name_valid: true,
 
-      description: "",
+      description: '',
       description_valid: true,
 
       order: undefined,
       order_valid: true,
 
-      status: "",
+      status: '',
 
       is_model: false,
 
@@ -302,9 +316,11 @@ export default {
       routines: [],
       skeleton_points: [],
       selected_points: [],
-      error_msg: "",
-    };
+      error_msg: '',
+      uploadProgress: 0,
+      video: null,
+    }
   },
-};
+}
 </script>
 <style src="@vueform/multiselect/themes/default.css"></style>

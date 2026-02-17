@@ -1,4 +1,4 @@
-<template>
+  <template>
   <ListModel
     title="Ejercicios"
     :table_info="{
