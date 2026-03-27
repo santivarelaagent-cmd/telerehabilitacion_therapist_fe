@@ -11,7 +11,7 @@
         <p class="light-font dark-text">{{ exercise.status }}</p>
         <template v-if="exercise.status=== 'Video procesado' || exercise.status === 'Video en procesamiento'">
           <h3 class="regular-font dark-text">Video subido:</h3>
-          <div ref="videoContainer" style="position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #000;">
+          <div ref="videoContainer" style="position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #000; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
             <video
               ref="video"
               :src="exercise.video"
@@ -28,6 +28,7 @@
               ref="canvas"
               style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; z-index: 2;"
             ></canvas>
+            <div @click="togglePlayPause" style="position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 60px); z-index: 5; cursor: pointer;" title="Pausar / Reanudar"></div>
             <button @click="toggleFullScreen" class="floating-fullscreen-btn" title="Pantalla Completa">
               <Fullscreen />
             </button>
@@ -138,6 +139,7 @@ export default {
     await this.poseService.initialize();
     this._movement_history_map = {};
     this._processedSegments = new Set();
+    this._chartInstances = {};
     this.loadHistoryFromStorage();
   },
   components: {
@@ -181,6 +183,62 @@ export default {
         });
       }
     },
+    refreshChartData() {
+      if (!this.showCharts) return;
+      const historyArr = this.getMovementHistoryArray();
+      const times = historyArr.map(frame => frame.t);
+      
+      for (const point of this.tracked_points) {
+        const chart = this._chartInstances && this._chartInstances[point.codename];
+        if (!chart) continue;
+        
+        chart.data.labels = times;
+        
+        let datasets = chart.data.datasets;
+        
+        if (this.chartType === 'posicion') {
+          const pointId = point.id;
+          const xs = [], ys = [], zs = [];
+          for (const frame of historyArr) {
+            const coords = frame.points[pointId];
+            if (coords) {
+              xs.push(coords[0]); ys.push(coords[1]); zs.push(coords[2]);
+            } else {
+              xs.push(null); ys.push(null); zs.push(null);
+            }
+          }
+          if (datasets[0]) datasets[0].data = xs;
+          if (datasets[1]) datasets[1].data = ys;
+          if (datasets[2]) datasets[2].data = zs;
+        } else {
+          const angles = [];
+          for (const frame of historyArr) {
+            angles.push(frame.angles && frame.angles[point.codename] !== undefined ? frame.angles[point.codename] : null);
+          }
+          if (datasets[0]) datasets[0].data = angles;
+        }
+
+        const stats = [];
+        for (const ds of datasets) {
+          const validData = ds.data.filter(v => v !== null && !isNaN(v));
+          if (validData.length > 0) {
+            const min = Math.min(...validData);
+            const max = Math.max(...validData);
+            const avg = validData.reduce((a, b) => a + b, 0) / validData.length;
+            stats.push({
+              label: ds.label.split('(')[0].trim(),
+              min: min.toFixed(2),
+              max: max.toFixed(2),
+              avg: avg.toFixed(2),
+              color: ds.borderColor
+            });
+          }
+        }
+        this.chartStats[point.codename] = stats;
+        
+        chart.update('none'); // Disable animation to keep UI highly performant
+      }
+    },
     saveHistoryToStorage() {
       if (!this.exercise || !this.exercise.id || !this._movement_history_map) return;
       try {
@@ -206,6 +264,16 @@ export default {
           }
         } catch (e) {
           console.error('Error cargando historial de resguardo:', e);
+        }
+      }
+    },
+    togglePlayPause() {
+      const video = this.$refs.video;
+      if (video) {
+        if (video.paused) {
+          video.play();
+        } else {
+          video.pause();
         }
       }
     },
@@ -241,8 +309,8 @@ export default {
           const canvas = document.getElementById(canvasId);
           if (!canvas) continue;
           
-          if (this.chartInstances[point.codename]) {
-            this.chartInstances[point.codename].destroy();
+          if (this._chartInstances && this._chartInstances[point.codename]) {
+            this._chartInstances[point.codename].destroy();
           }
 
           let datasets = [];
@@ -300,7 +368,8 @@ export default {
           }
           this.chartStats[point.codename] = stats;
           
-          this.chartInstances[point.codename] = new Chart(canvas, {
+          if (!this._chartInstances) this._chartInstances = {};
+          this._chartInstances[point.codename] = new Chart(canvas, {
             type: 'line',
             data: {
               labels: times,
@@ -419,6 +488,11 @@ export default {
         this.saveHistoryToStorage();
         this._lastSaveTime = nowTime;
       }
+
+      if (this.showCharts && nowTime - (this._lastChartUpdate || 0) > 500) {
+        this.refreshChartData();
+        this._lastChartUpdate = nowTime;
+      }
     },
     downloadMovementJSON() {
       const dataStr = JSON.stringify({
@@ -467,7 +541,6 @@ export default {
       poseService: null,
       hasResultsFlag: false,
       showCharts: false,
-      chartInstances: {},
       chartStats: {},
       analysisProgress: 0,
       chartType: 'posicion'
