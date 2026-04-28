@@ -535,6 +535,7 @@ export default {
   /* Escape any parent padding/margin */
   width: 100%;
   margin: 0;
+  font-family: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* Header Bar */
