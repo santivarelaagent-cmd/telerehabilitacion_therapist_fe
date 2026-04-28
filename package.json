@@ -16,6 +16,7 @@
     "mdue": "^0.1.2",
     "simple-object-query": "^1.6.1",
     "telerehabilitation_admin": "file:",
+    "three": "^0.184.0",
     "vue": "^3.0.0",
     "vue-router": "^4.0.0-rc.1"
   },

@@ -118,6 +118,14 @@
           <ChartLine class="action-icon" />
           <span>Generar Gráficas ({{ analysisProgress }}%)</span>
         </button>
+        <button class="btn btn-dark" @click="exportToCSV" :disabled="!hasResultsFlag">
+          <FileExcel class="action-icon" />
+          <span>Exportar a Excel (CSV)</span>
+        </button>
+        <button class="btn btn-primary" @click="$router.push(`/exercises/${exercise.id}/3d-viewer`)" :disabled="!hasResultsFlag">
+          <Cube class="action-icon" />
+          <span>Ver Análisis en 3D</span>
+        </button>
       </div>
     </div>
   </div>
@@ -126,7 +134,7 @@
 <script>
 import Http from '@/lib/http';
 import '@/styles/views/view_routine.scss';
-import { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine } from "mdue";
+import { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel } from "mdue";
 import PoseLandmarkerService from '@/services/poseLandmarkerService';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
@@ -148,7 +156,9 @@ export default {
     Upload,
     Download,
     Fullscreen,
-    ChartLine
+    ChartLine,
+    Cube,
+    FileExcel
   },
   computed: {
     hasResults() {
@@ -292,6 +302,52 @@ export default {
       if (response.status === 200) {
         this.difficulties = response.data;
       }
+    },
+    exportToCSV() {
+      const historyArr = this.getMovementHistoryArray();
+      if (!historyArr || historyArr.length === 0) return;
+
+      const tracked = this.tracked_points || [];
+      
+      // Build CSV Headers
+      let headers = ['Tiempo (s)'];
+      for (const point of tracked) {
+        const name = point.verbose.replace(/"/g, '""'); // Escape double quotes just in case
+        headers.push(`"${name} X"`, `"${name} Y"`, `"${name} Z"`, `"${name} Ángulo (°)"`);
+      }
+      
+      let csvContent = headers.join(',') + '\n';
+      
+      // Build CSV Rows
+      for (const frame of historyArr) {
+        let row = [frame.t.toFixed(3)];
+        for (const point of tracked) {
+          const ptId = point.id;
+          const codename = point.codename;
+          const coords = frame.points[ptId];
+          
+          if (coords) {
+            row.push(coords[0].toFixed(4), coords[1].toFixed(4), coords[2].toFixed(4));
+          } else {
+            row.push('', '', '');
+          }
+          
+          const angle = frame.angles && frame.angles[codename] !== undefined ? frame.angles[codename] : '';
+          row.push(angle !== '' ? parseFloat(angle).toFixed(2) : '');
+        }
+        csvContent += row.join(',') + '\n';
+      }
+      
+      // Trigger File Download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = this.exercise.name ? this.exercise.name.replace(/\s+/g, '_') : 'ejercicio';
+      link.setAttribute('download', `datos_movimiento_${fileName}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     },
     getMovementHistoryArray() {
       if (!this._movement_history_map) return [];

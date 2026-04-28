@@ -18,6 +18,7 @@ import NewExercise from "@/views/signedIn/exercises/new_exercise";
 import ViewExercise from "@/views/signedIn/exercises/view_exercise.vue";
 import EditExercise from "@/views/signedIn/exercises/edit_exercise";
 import NewDifficulty from "@/views/signedIn/exercises/new-difficulty.vue";
+import View3DViewer from "@/views/signedIn/3d_viewer/index.vue";
 import MyPatients from "@/views/signedIn/my-patients/my_patients.vue";
 import ViewMyPatients from "@/views/signedIn/my-patients/view_my_patient.vue";
 import PatientRoutine from "@/views/signedIn/my-patients/patient_routine.vue";
@@ -157,6 +158,12 @@ const routes = [
                 path: "exercises/:exercise_id/new-difficulty",
                 name: "new_difficulty",
                 component: NewDifficulty,
+                meta: {requiresAuth: true},
+            },
+            {
+                path: "exercises/:exercise_id/3d-viewer",
+                name: "view_3d_viewer",
+                component: View3DViewer,
                 meta: {requiresAuth: true},
             },
             {

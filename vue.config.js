@@ -9,7 +9,8 @@ module.exports = {
   transpileDependencies: [
     'firebase', 
     '@firebase',
-    '@mediapipe/tasks-vision'
+    '@mediapipe/tasks-vision',
+    'three'
   ],
   configureWebpack: {
     module: {
