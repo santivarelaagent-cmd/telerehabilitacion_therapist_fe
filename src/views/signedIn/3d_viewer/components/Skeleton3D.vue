@@ -195,7 +195,8 @@ export default {
           [11, 23], [12, 24], [23, 24], [23, 25], [24, 26],
           [25, 27], [26, 28],
           [15, 17], [15, 19], [15, 21], [16, 18], [16, 20], [16, 22],
-          [27, 29], [27, 31], [28, 30], [28, 32]
+          [27, 29], [27, 31], [29, 31], // Left Foot (Ankle-Heel, Ankle-Toe, Heel-Toe)
+          [28, 30], [28, 32], [30, 32]  // Right Foot (Ankle-Heel, Ankle-Toe, Heel-Toe)
         ];
         
         for (const connection of POSE_CONNECTIONS) {
