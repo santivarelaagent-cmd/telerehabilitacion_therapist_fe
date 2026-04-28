@@ -70,7 +70,7 @@
           
           <div v-show="showCharts" style="width: 100%; margin-top: 30px;">
             <hr>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
               <h3 class="regular-font dark-text" style="margin: 0;">Análisis de Movimiento en el Tiempo:</h3>
               <select v-model="chartType" @change="generateCharts" class="form-control" style="width: 250px; font-size: 1.1em; padding: 8px;">
                 <option value="posicion">Posición vs Tiempo (X, Y, Z)</option>
@@ -612,18 +612,36 @@ export default {
   border: 1px solid #2f2f2f;
   border-radius: 10px;
   padding: 20px;
-  display:flex;
+  display: flex;
   flex-direction: column;
-  video { width: auto; justify-self: center; }
+  overflow-x: auto;
+  video { width: 100%; justify-self: center; }
+}
+.patients-table, .diff-table {
+  overflow-x: auto;
+  display: grid;
+  width: 100%;
 }
 .actions-wrapper {
   width: 90%;
-  padding: 20px;
+  padding: 15px;
   display: flex;
-  justify-content: space-evenly;
-  button { padding: 10px }
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  button { 
+    padding: 8px 16px; 
+    flex: 0 0 auto; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 8px; 
+    font-size: 0.9em;
+    max-height: 40px;
+    border-radius: 6px;
+  }
 }
-.action-icon { font-size: 2em; }
+.action-icon { font-size: 1.4em; }
 
 .floating-fullscreen-btn {
   position: absolute;

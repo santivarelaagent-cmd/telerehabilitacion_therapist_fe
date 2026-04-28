@@ -543,6 +543,8 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   background: white;
   border-radius: 12px;
   padding: 14px 22px;
@@ -550,8 +552,8 @@ export default {
   flex-shrink: 0;
 }
 
-.header-left { display: flex; align-items: center; }
-.header-right { display: flex; align-items: center; gap: 10px; }
+.header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.header-right { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 
 /* Main 3D Viewport */
 .main-content {
@@ -580,6 +582,7 @@ export default {
 
 .tab-bar {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 2px solid #f0f0f0;
   padding: 0 16px;
   background: #fafafa;
@@ -649,11 +652,13 @@ export default {
 }
 
 .scrubber-container {
-  height: 70px;
+  height: auto;
+  min-height: 70px;
   background: white;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 0 20px;
+  padding: 14px 20px;
   gap: 15px;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
 }
