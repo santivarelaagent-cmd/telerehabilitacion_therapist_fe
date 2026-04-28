@@ -44,6 +44,7 @@
 <script>
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { POSE_CONNECTIONS, CAMERA_OFFSETS } from '../utils/constants';
 
 export default {
   name: 'Skeleton3D',
@@ -190,14 +191,7 @@ export default {
           this.spheres.push(sphere);
         }
         
-        const POSE_CONNECTIONS = [
-          [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
-          [11, 23], [12, 24], [23, 24], [23, 25], [24, 26],
-          [25, 27], [26, 28],
-          [15, 17], [15, 19], [15, 21], [16, 18], [16, 20], [16, 22],
-          [27, 29], [27, 31], [29, 31], // Left Foot (Ankle-Heel, Ankle-Toe, Heel-Toe)
-          [28, 30], [28, 32], [30, 32]  // Right Foot (Ankle-Heel, Ankle-Toe, Heel-Toe)
-        ];
+
         
         for (const connection of POSE_CONNECTIONS) {
           const limbGeo = new THREE.CylinderGeometry(0.025, 0.025, 1, 8); // Base length 1
@@ -238,7 +232,7 @@ export default {
             
             const isTracked = this.trackedIndices && this.trackedIndices.includes(i);
             sphere.material.color.set(isTracked ? '#FF3366' : '#4BC0C0');
-            sphere.scale.setScalar(isTracked ? 0.08 : 0.05);
+            sphere.scale.setScalar(0.06); // Todos del mismo tamaño
           } else {
             sphere.visible = false;
           }
@@ -308,30 +302,51 @@ export default {
     setCameraView(viewType) {
       if (!this.camera || !this.controls) return;
       
-      // Target centroid slightly below origin to capture full body
-      const target = new THREE.Vector3(0, -0.5, 0); 
+      // Calculate skeleton centroid
+      let target = new THREE.Vector3(0, 0, 0);
+      let visibleSpheres = 0;
+      
+      if (this.spheres && this.spheres.length > 0) {
+        for (let sphere of this.spheres) {
+          if (sphere && sphere.visible) {
+            target.add(sphere.position);
+            visibleSpheres++;
+          }
+        }
+      }
+      
+      if (visibleSpheres > 0) {
+        target.divideScalar(visibleSpheres);
+      } else {
+        // Fallback if no skeleton visible
+        target.set(0, -0.5, 0);
+      }
       
       switch(viewType) {
         case 'home':
-          this.camera.position.set(2.5, 0.0, 4.0); 
+          this.camera.position.set(
+            target.x + CAMERA_OFFSETS.HOME.x, 
+            target.y + CAMERA_OFFSETS.HOME.y, 
+            target.z + CAMERA_OFFSETS.HOME.z
+          ); 
           break;
         case 'front':
-          this.camera.position.set(0, -0.5, 4.5); 
+          this.camera.position.set(target.x, target.y, target.z + CAMERA_OFFSETS.CARDINAL); 
           break;
         case 'back':
-          this.camera.position.set(0, -0.5, -4.5); 
+          this.camera.position.set(target.x, target.y, target.z - CAMERA_OFFSETS.CARDINAL); 
           break;
         case 'right':
-          this.camera.position.set(4.5, -0.5, 0); 
+          this.camera.position.set(target.x + CAMERA_OFFSETS.CARDINAL, target.y, target.z); 
           break;
         case 'left':
-          this.camera.position.set(-4.5, -0.5, 0); 
+          this.camera.position.set(target.x - CAMERA_OFFSETS.CARDINAL, target.y, target.z); 
           break;
         case 'top':
-          this.camera.position.set(0, 4.5, 0.01); 
+          this.camera.position.set(target.x, target.y + CAMERA_OFFSETS.CARDINAL, target.z + 0.01); 
           break;
         case 'bottom':
-          this.camera.position.set(0, -4.5, 0.01); 
+          this.camera.position.set(target.x, target.y - CAMERA_OFFSETS.CARDINAL, target.z + 0.01); 
           break;
       }
       

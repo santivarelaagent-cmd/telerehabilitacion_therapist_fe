@@ -2,28 +2,13 @@
   <div class="viewer-3d-container">
     
     <!-- Header Bar -->
-    <div class="viewer-header">
-      <div class="header-left">
-        <h2 class="light-font dark-text" style="margin: 0;">Visor 3D</h2>
-        <div v-if="jsonData" class="source-badge" style="display: flex; align-items: center; gap: 8px; margin-left: 16px;">
-          <span :style="{ background: dataSource === 'localstorage' ? '#4BC0C0' : '#8e44ad', color: 'white', padding: '4px 8px', borderRadius: '5px', fontSize: '0.75em', fontWeight: 'bold' }">
-            {{ dataSource === 'localstorage' ? '💾 Local Storage' : '📁 Archivo JSON' }}
-          </span>
-          <span style="font-size: 0.85em; color: #555; font-weight: 500;" :title="dataSourceName">{{ dataSourceName }}</span>
-          <span v-if="jsonData.exercise_name" style="font-size: 0.85em; color: #333; font-weight: 600;">— {{ jsonData.exercise_name }}</span>
-        </div>
-      </div>
-      <div class="header-right">
-        <label class="card" style="display:flex; align-items:center; gap:8px; cursor:pointer; padding: 8px 14px;" v-if="!jsonData">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <span style="font-size: 0.9em; font-weight: 500;">Cargar archivo JSON</span>
-          <input type="file" accept=".json" @change="onFileChange" style="display:none" />
-        </label>
-        <button v-else class="btn btn-dark" style="border-radius: 6px; padding: 8px 16px; font-size: 0.9em;" @click="resetData">
-          Cargar otro archivo
-        </button>
-      </div>
-    </div>
+    <ViewerHeader 
+      :jsonData="jsonData"
+      :dataSource="dataSource"
+      :dataSourceName="dataSourceName"
+      @file-change="handleFileChange"
+      @reset-data="resetData"
+    />
 
     <!-- 3D Viewer -->
     <div class="main-content" ref="mainContent">
@@ -45,20 +30,16 @@
       </div>
 
       <!-- Scrubber -->
-      <div class="scrubber-container" v-if="jsonData">
-        <button class="play-btn" @click="togglePlay">
-          {{ isPlaying ? '⏸' : '▶' }}
-        </button>
-        <input 
-          type="range" 
-          min="0" 
-          :max="totalFrames - 1" 
-          v-model.number="currentFrameIndex"
-          class="timeline-slider"
-          @input="onScrub"
-        />
-        <span class="time-label">{{ currentTimeFormatted }} / {{ totalTimeFormatted }}</span>
-      </div>
+      <PlaybackControls 
+        v-if="jsonData"
+        v-model="currentFrameIndex"
+        :isPlaying="isPlaying"
+        :totalFrames="totalFrames"
+        :currentTimeFormatted="currentTimeFormatted"
+        :totalTimeFormatted="totalTimeFormatted"
+        @toggle-play="togglePlay"
+        @scrub="onScrub"
+      />
     </div>
 
     <!-- Bottom Tab Panel -->
@@ -92,41 +73,44 @@
       </div>
 
       <!-- Metrics Tab -->
-      <div v-show="activeTab === 'metrics'" class="tab-content">
-        <div v-if="metrics" style="display: flex; flex-wrap: wrap; gap: 14px;">
-          <div v-for="(metric, pointName) in metrics" :key="pointName" class="metric-card-item">
-            <div style="font-weight: 700; color: #4BC0C0; margin-bottom: 6px; font-size: 0.9em;">{{ formatPointName(pointName) }}</div>
-            <div style="font-size: 0.85em; color: #555;">Repeticiones: <strong>{{ metric.reps }}</strong></div>
-            <div style="font-size: 0.85em; color: #555;">Rango: {{ metric.min }}° – {{ metric.max }}°</div>
-            <div style="font-size: 0.85em; color: #555;">Amplitud: <strong>{{ metric.amplitude }}°</strong></div>
-          </div>
-        </div>
-        <div v-else>
-          <p style="font-size: 0.9em; color: #888;">Este archivo JSON no contiene cálculos angulares previos para procesar métricas.</p>
-        </div>
-      </div>
+      <MetricsTab v-show="activeTab === 'metrics'" :metrics="metrics" />
 
-      <!-- Charts Tab -->
+      <!-- Angles Tab -->
       <div v-show="activeTab === 'charts'" class="tab-content charts-grid">
-        <template v-if="metrics">
-          <div v-for="(metric, pointName) in metrics" :key="'chart-' + pointName" class="chart-wrapper">
-            <div style="font-size: 0.8em; font-weight: 700; color: #4BC0C0; margin-bottom: 4px;">{{ formatPointName(pointName) }}</div>
-            <canvas :ref="'chart_' + pointName" height="100"></canvas>
-          </div>
+        <template v-if="metrics && sampledData">
+          <AngleChart
+            v-for="(metric, pointName) in metrics"
+            :key="'chart-' + pointName"
+            :title="formatPointName(pointName)"
+            :labels="sampledData.labels"
+            :dataPoints="sampledData.sampledFrames.map(f => f.angles && f.angles[pointName] != null ? f.angles[pointName] : null)"
+            :currentFrameIndex="currentFrameIndex"
+            :step="sampledData.step"
+            :isPlaying="isPlaying"
+            @seek="handleSeek"
+          />
         </template>
         <div v-else>
           <p style="font-size: 0.9em; color: #888;">Sin datos de ángulos para graficar.</p>
         </div>
       </div>
+
       <!-- Positions Tab -->
       <div v-show="activeTab === 'positions'" class="tab-content charts-grid">
-        <template v-if="activeTrackedIndices.length > 0">
-          <div v-for="idx in activeTrackedIndices" :key="'pos-' + idx" class="chart-wrapper">
-            <div style="font-size: 0.8em; font-weight: 700; color: #8e44ad; margin-bottom: 4px;">
-              {{ landmarkName(idx) }} — Posición (X, Y, Z)
-            </div>
-            <canvas :ref="'posChart_' + idx" height="100"></canvas>
-          </div>
+        <template v-if="activeTrackedIndices.length > 0 && sampledData">
+          <PositionChart
+            v-for="idx in activeTrackedIndices"
+            :key="'pos-' + idx"
+            :title="landmarkName(idx)"
+            :labels="sampledData.labels"
+            :xData="sampledData.sampledFrames.map(f => { const pt = f.points && (f.points[idx] || f.points[String(idx)]); return pt ? parseFloat(pt[0].toFixed(4)) : null; })"
+            :yData="sampledData.sampledFrames.map(f => { const pt = f.points && (f.points[idx] || f.points[String(idx)]); return pt ? parseFloat(pt[1].toFixed(4)) : null; })"
+            :zData="sampledData.sampledFrames.map(f => { const pt = f.points && (f.points[idx] || f.points[String(idx)]); return pt ? parseFloat(pt[2].toFixed(4)) : null; })"
+            :currentFrameIndex="currentFrameIndex"
+            :step="sampledData.step"
+            :isPlaying="isPlaying"
+            @seek="handleSeek"
+          />
         </template>
         <div v-else>
           <p style="font-size: 0.9em; color: #888;">No hay puntos rastreados activos para mostrar posición.</p>
@@ -140,51 +124,24 @@
 <script>
 import Skeleton3D from './components/Skeleton3D.vue';
 import MetricsService from '@/services/metricsService';
-import Chart from 'chart.js/auto';
-
-// Custom Chart.js plugin: draws a red vertical playhead line
-const playheadPlugin = {
-  id: 'playhead',
-  afterDatasetsDraw(chart) {
-    const idx = chart._playheadIndex;
-    if (idx == null || idx < 0) return;
-    const meta = chart.getDatasetMeta(0);
-    if (!meta || !meta.data || !meta.data[idx]) return;
-
-    const x = meta.data[idx].x;
-    const { top, bottom } = chart.chartArea;
-    const ctx = chart.ctx;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
-    ctx.strokeStyle = '#FF3366';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 3]);
-    ctx.stroke();
-    ctx.restore();
-  }
-};
-
-const POSE_LANDMARK_IDS = {
-  "LEFT_SHOULDER": 11,
-  "RIGHT_SHOULDER": 12,
-  "LEFT_ELBOW": 13,
-  "RIGHT_ELBOW": 14,
-  "LEFT_WRIST": 15,
-  "RIGHT_WRIST": 16,
-  "LEFT_HIP": 23,
-  "RIGHT_HIP": 24,
-  "LEFT_KNEE": 25,
-  "RIGHT_KNEE": 26,
-  "LEFT_ANKLE": 27,
-  "RIGHT_ANKLE": 28
-};
+import MetricsTab from './components/MetricsTab.vue';
+import AngleChart from './components/AngleChart.vue';
+import PositionChart from './components/PositionChart.vue';
+import ViewerHeader from './components/ViewerHeader.vue';
+import PlaybackControls from './components/PlaybackControls.vue';
+import { POSE_LANDMARK_IDS } from './utils/constants';
+import { formatPointName, landmarkName } from './utils/formatters';
 
 export default {
   name: 'View3DViewer',
-  components: { Skeleton3D },
+  components: { 
+    Skeleton3D, 
+    MetricsTab, 
+    AngleChart, 
+    PositionChart,
+    ViewerHeader,
+    PlaybackControls
+  },
   data() {
     return {
       jsonData: null,
@@ -197,11 +154,7 @@ export default {
       isPlaying: false,
       playbackInterval: null,
       metrics: null,
-      activeTab: 'metrics',
-      chartInstances: {},
-      chartStep: 1,
-      posChartInstances: {},
-      posChartStep: 1
+      activeTab: 'metrics'
     };
   },
   computed: {
@@ -225,33 +178,19 @@ export default {
     totalTimeFormatted() {
       if (!this.jsonData || !this.jsonData.frames || this.totalFrames === 0) return '0.0s';
       return this.jsonData.frames[this.totalFrames - 1].t.toFixed(1) + 's';
-    }
-  },
-  watch: {
-    currentFrameIndex(newIndex) {
-      // Update angle chart playheads
-      const instances = Object.values(this.chartInstances);
-      if (instances.length) {
-        const playheadIdx = Math.floor(newIndex / this.chartStep);
-        for (const chart of instances) {
-          chart._playheadIndex = playheadIdx;
-          chart.draw();
-        }
-      }
-      // Update position chart playheads
-      const posInstances = Object.values(this.posChartInstances);
-      if (posInstances.length) {
-        const posPlayheadIdx = Math.floor(newIndex / this.posChartStep);
-        for (const chart of posInstances) {
-          chart._playheadIndex = posPlayheadIdx;
-          chart.draw();
-        }
-      }
+    },
+    sampledData() {
+      if (!this.jsonData || !this.jsonData.frames) return null;
+      const frames = this.jsonData.frames;
+      const step = Math.max(1, Math.floor(frames.length / 300));
+      const sampledFrames = frames.filter((_, i) => i % step === 0);
+      const labels = sampledFrames.map(f => f.t ? f.t.toFixed(1) + 's' : '');
+
+      return { step, labels, sampledFrames };
     }
   },
   methods: {
-    onFileChange(event) {
-      const file = event.target.files[0];
+    handleFileChange(file) {
       if (!file) return;
 
       const reader = new FileReader();
@@ -272,11 +211,6 @@ export default {
       this.dataSourceName = name;
       this.currentFrameIndex = 0;
       this.activeTab = 'metrics';
-      // Destroy old charts when new data is loaded
-      Object.values(this.chartInstances).forEach(c => c.destroy());
-      Object.values(this.posChartInstances).forEach(c => c.destroy());
-      this.chartInstances = {};
-      this.posChartInstances = {};
       this.calculateMetrics();
     },
     calculateMetrics() {
@@ -333,168 +267,18 @@ export default {
         else if (document.msExitFullscreen) document.msExitFullscreen();
       }
     },
+    handleSeek(originalIdx) {
+      if (this.isPlaying) this.pausePlayback();
+      this.currentFrameIndex = Math.min(originalIdx, this.totalFrames - 1);
+    },
     switchToCharts() {
       this.activeTab = 'charts';
-      this.$nextTick(() => this.renderCharts());
-    },
-    renderCharts() {
-      if (!this.metrics || !this.jsonData) return;
-
-      // Sample every N frames for performance (max 300 points)
-      const frames = this.jsonData.frames;
-      const step = Math.max(1, Math.floor(frames.length / 300));
-      this.chartStep = step; // Store for the watcher to use
-      const sampledFrames = frames.filter((_, i) => i % step === 0);
-      const labels = sampledFrames.map(f => f.t ? f.t.toFixed(1) + 's' : '');
-      const initialPlayheadIdx = Math.floor(this.currentFrameIndex / step);
-
-      for (const pointName of Object.keys(this.metrics)) {
-        const canvasRef = this.$refs['chart_' + pointName];
-        const canvas = Array.isArray(canvasRef) ? canvasRef[0] : canvasRef;
-        if (!canvas) continue;
-
-        // Destroy previous chart instance if exists
-        if (this.chartInstances[pointName]) {
-          this.chartInstances[pointName].destroy();
-        }
-
-        const angleData = sampledFrames.map(f => f.angles && f.angles[pointName] != null ? f.angles[pointName] : null);
-
-        const chartInstance = new Chart(canvas, {
-          type: 'line',
-          plugins: [playheadPlugin], // Register custom playhead plugin
-          data: {
-            labels,
-            datasets: [{
-              label: this.formatPointName(pointName) + ' (°)',
-              data: angleData,
-              borderColor: '#4BC0C0',
-              backgroundColor: 'rgba(75,192,192,0.08)',
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.3,
-              fill: true,
-              spanGaps: true
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            animation: false,
-            onClick: (event, _elements, chart) => {
-              const xScale = chart.scales.x;
-              if (!xScale) return;
-              const sampledIdx = Math.round(xScale.getValueForPixel(event.x));
-              if (sampledIdx == null || sampledIdx < 0) return;
-              const originalIdx = Math.min(sampledIdx * step, this.totalFrames - 1);
-              if (this.isPlaying) this.pausePlayback();
-              this.currentFrameIndex = originalIdx;
-            },
-            plugins: {
-              legend: { display: false },
-              tooltip: { mode: 'index', intersect: false }
-            },
-            scales: {
-              x: {
-                ticks: { maxTicksLimit: 8, font: { size: 10 } },
-                grid: { color: 'rgba(0,0,0,0.05)' }
-              },
-              y: {
-                title: { display: true, text: 'Grados (°)', font: { size: 10 } },
-                ticks: { font: { size: 10 } },
-                grid: { color: 'rgba(0,0,0,0.05)' }
-              }
-            }
-          }
-        });
-
-        // Set initial playhead position
-        chartInstance._playheadIndex = initialPlayheadIdx;
-        this.chartInstances[pointName] = chartInstance;
-      }
     },
     switchToPositions() {
       this.activeTab = 'positions';
-      this.$nextTick(() => this.renderPositionCharts());
     },
-    renderPositionCharts() {
-      if (!this.jsonData || !this.activeTrackedIndices.length) return;
-
-      const frames = this.jsonData.frames;
-      const step = Math.max(1, Math.floor(frames.length / 300));
-      this.posChartStep = step;
-      const sampledFrames = frames.filter((_, i) => i % step === 0);
-      const labels = sampledFrames.map(f => f.t ? f.t.toFixed(1) + 's' : '');
-      const initialPlayheadIdx = Math.floor(this.currentFrameIndex / step);
-
-      for (const landmarkIdx of this.activeTrackedIndices) {
-        const canvasRef = this.$refs['posChart_' + landmarkIdx];
-        const canvas = Array.isArray(canvasRef) ? canvasRef[0] : canvasRef;
-        if (!canvas) continue;
-
-        if (this.posChartInstances[landmarkIdx]) {
-          this.posChartInstances[landmarkIdx].destroy();
-        }
-
-        const xData = sampledFrames.map(f => {
-          const pt = f.points && (f.points[landmarkIdx] || f.points[String(landmarkIdx)]);
-          return pt ? parseFloat(pt[0].toFixed(4)) : null;
-        });
-        const yData = sampledFrames.map(f => {
-          const pt = f.points && (f.points[landmarkIdx] || f.points[String(landmarkIdx)]);
-          return pt ? parseFloat(pt[1].toFixed(4)) : null;
-        });
-        const zData = sampledFrames.map(f => {
-          const pt = f.points && (f.points[landmarkIdx] || f.points[String(landmarkIdx)]);
-          return pt ? parseFloat(pt[2].toFixed(4)) : null;
-        });
-
-        const chartInstance = new Chart(canvas, {
-          type: 'line',
-          plugins: [playheadPlugin],
-          data: {
-            labels,
-            datasets: [
-              { label: 'X', data: xData, borderColor: '#e74c3c', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3, spanGaps: true },
-              { label: 'Y', data: yData, borderColor: '#2ecc71', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3, spanGaps: true },
-              { label: 'Z', data: zData, borderColor: '#3498db', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.3, spanGaps: true }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            animation: false,
-            onClick: (event, _elements, chart) => {
-              const xScale = chart.scales.x;
-              if (!xScale) return;
-              const sampledIdx = Math.round(xScale.getValueForPixel(event.x));
-              if (sampledIdx == null || sampledIdx < 0) return;
-              const originalIdx = Math.min(sampledIdx * step, this.totalFrames - 1);
-              if (this.isPlaying) this.pausePlayback();
-              this.currentFrameIndex = originalIdx;
-            },
-            plugins: {
-              legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
-              tooltip: { mode: 'index', intersect: false }
-            },
-            scales: {
-              x: { ticks: { maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
-              y: { title: { display: true, text: 'Posición (norm.)', font: { size: 10 } }, ticks: { font: { size: 10 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
-            }
-          }
-        });
-
-        chartInstance._playheadIndex = initialPlayheadIdx;
-        this.posChartInstances[landmarkIdx] = chartInstance;
-      }
-    },
-    landmarkName(idx) {
-      const entry = Object.entries(POSE_LANDMARK_IDS).find(([, v]) => v === idx);
-      return entry ? this.formatPointName(entry[0]) : 'Punto ' + idx;
-    },
-    formatPointName(name) {
-      return name.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-    }
+    formatPointName,
+    landmarkName
   },
   mounted() {
     // Optional: auto-load from localStorage if exercise_id is in route
@@ -538,23 +322,6 @@ export default {
   font-family: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* Header Bar */
-.viewer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  background: white;
-  border-radius: 12px;
-  padding: 14px 22px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  flex-shrink: 0;
-}
-
-.header-left { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.header-right { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-
 /* Main 3D Viewport */
 .main-content {
   flex: 1;
@@ -575,7 +342,9 @@ export default {
 .bottom-panel {
   background: white;
   border-radius: 12px;
+  border: 1px solid #e8e8e8;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin-top: 10px;
   flex-shrink: 0;
   overflow: hidden;
 }
@@ -618,14 +387,6 @@ export default {
   gap: 16px;
 }
 
-.chart-wrapper {
-  background: #f8f9fa;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  padding: 12px 14px;
-  cursor: crosshair;
-}
-
 .canvas-wrapper {
   flex-grow: 1;
   position: relative;
@@ -650,55 +411,4 @@ export default {
   background: #f4f7f6;
   color: #333;
 }
-
-.scrubber-container {
-  height: auto;
-  min-height: 70px;
-  background: white;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  padding: 14px 20px;
-  gap: 15px;
-  box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
-}
-
-.timeline-slider {
-  flex-grow: 1;
-  cursor: pointer;
-  accent-color: #4BC0C0;
-}
-
-.play-btn {
-  background: #4BC0C0;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 45px;
-  height: 45px;
-  font-size: 1.2em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-.play-btn:hover { transform: scale(1.05); }
-
-.metrics-card {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 15px;
-  border: 1px solid #e1e1e1;
-}
-
-.metric-item {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #ddd;
-}
-.metric-item p { margin: 4px 0; font-size: 0.9em; color: #555; }
-.card { padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
-.mt-3 { margin-top: 15px; }
-.time-label { font-size: 0.9em; font-weight: 500; color: #555; min-width: 80px; text-align: right; }
 </style>
