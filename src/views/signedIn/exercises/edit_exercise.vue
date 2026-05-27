@@ -97,27 +97,35 @@
             />
           </div>
           <div class="form-group">
-            <label for="skeleton_points" class="light-font dark-text"
+            <label class="light-font dark-text"
               >Seleccione los puntos a seguir</label
             >
             <div>
-              <Multiselect
-                class="select light-font"
-                :options="
-                  skeleton_points.map((point) => ({
-                    value: point.id,
-                    label: point.verbose,
-                  }))
-                "
-                mode="tags"
-                searchable
-                v-model="selected_points"
-              >
-              </Multiselect>
+              <button type="button" class="btn btn-primary" @click="isModalVisible = true" style="margin-bottom: 15px; padding: 8px 16px; border-radius: 8px; border: none; background: #4BC0C0; color: white; cursor: pointer; font-weight: 600;">
+                👁️ Abrir Selector Visual de Puntos
+              </button>
+              
+              <div class="chips-container" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; min-height: 30px; font-family: 'Open Sans', sans-serif; margin-top: 8px;">
+                <span v-if="selected_points.length === 0" class="light-italic-font muted-text" style="grid-column: 1 / -1;">
+                  Ningún punto seleccionado.
+                </span>
+                <div v-for="ptId in selected_points" :key="'main-chip-'+(ptId.value || ptId)" style="background-color: #4BC0C0; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600; border: none; overflow: hidden;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ getPointName(ptId.value || ptId) }}</span>
+                  <span style="cursor: pointer; font-weight: bold; font-size: 1.1rem; opacity: 0.8; flex-shrink: 0;" @click="removePoint(ptId.value || ptId)">&times;</span>
+                </div>
+              </div>
+
+              <SkeletonSelectorModal 
+                :visible="isModalVisible" 
+                @update:visible="isModalVisible = $event"
+                :initialSelected="selected_points.map(p => p.value || p)"
+                :availablePoints="skeleton_points"
+                @saved="onPointsSaved"
+              />
             </div>
           </div>
         </div>
-        <button type="submit" class="btn btn-success btn-lg">
+        <button type="submit" class="btn btn-success btn-lg" style="margin-top: 24px;">
           <plus />
           <cached v-if="loading" class="rotate" />
           <span v-else>Guardar cambios</span>
@@ -131,15 +139,16 @@
 import { Plus, Cached } from 'mdue'
 import Http from '@/lib/http'
 import '@/styles/views/edit_exercise.scss'
-import Multiselect from '@vueform/multiselect'
+import SkeletonSelectorModal from '@/components/SkeletonSelectorModal.vue'
 import ExerciseService from '@/services/exerciseService'
+
 export default {
   name: 'EditExercise',
 
   components: {
     Plus,
     Cached,
-    Multiselect,
+    SkeletonSelectorModal,
   },
 
   async beforeMount() {
@@ -149,6 +158,16 @@ export default {
   },
 
   methods: {
+    onPointsSaved(points) {
+      this.selected_points = points;
+    },
+    removePoint(id) {
+      this.selected_points = this.selected_points.filter(p => (p.value || p) !== id);
+    },
+    getPointName(idx) {
+      const match = this.skeleton_points.find(p => p.id === idx || p.value === idx);
+      return match ? (match.verbose || match.label) : `Punto ${idx}`;
+    },
     videoChanged(e) {
       console.log(e.target.files[0])
       this.video = e.target.files[0]
@@ -316,6 +335,7 @@ export default {
       routines: [],
       skeleton_points: [],
       selected_points: [],
+      isModalVisible: false,
       error_msg: '',
       uploadProgress: 0,
       video: null,
@@ -323,4 +343,3 @@ export default {
   },
 }
 </script>
-<style src="@vueform/multiselect/themes/default.css"></style>

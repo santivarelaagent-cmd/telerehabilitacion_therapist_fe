@@ -60,6 +60,65 @@
             v-model="username"
           />
         </div>
+        <div class="form-group">
+          <label for="birth_date" class="light-font dark-text">Fecha de nacimiento</label>
+          <input
+            type="date"
+            name="birth_date"
+            id="birth_date"
+            :class="{ 'light-font': true, 'has-error': !birth_date_valid }"
+            v-model="birth_date"
+          />
+        </div>
+        <div class="form-group">
+          <label for="height" class="light-font dark-text">Estatura (m)</label>
+          <input
+            type="number"
+            step="0.01"
+            name="height"
+            id="height"
+            :class="{ 'light-font': true, 'has-error': !height_valid }"
+            placeholder="Estatura en metros (ej. 1.75)"
+            v-model="height"
+          />
+        </div>
+        <div class="form-group">
+          <label for="weight" class="light-font dark-text">Peso (kg)</label>
+          <input
+            type="number"
+            step="0.1"
+            name="weight"
+            id="weight"
+            :class="{ 'light-font': true, 'has-error': !weight_valid }"
+            placeholder="Peso en kilogramos (ej. 70.5)"
+            v-model="weight"
+          />
+        </div>
+        <div class="form-group">
+          <label for="gender" class="light-font dark-text">Género</label>
+          <select
+            name="gender"
+            id="gender"
+            :class="{ 'light-font': true, 'has-error': !gender_valid }"
+            v-model="gender"
+          >
+            <option value="" disabled>Seleccione un género</option>
+            <option value="Masculino">Masculino</option>
+            <option value="Femenino">Femenino</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="description" class="light-font dark-text">Descripción / Notas</label>
+          <textarea
+            name="description"
+            id="description"
+            rows="3"
+            :class="{ 'light-font': true, 'has-error': !description_valid }"
+            placeholder="Notas del paciente (ej. motivo de rehabilitación)"
+            v-model="description"
+          ></textarea>
+        </div>
         <button type="submit" class="btn btn-success btn-lg">
           <plus />
           <cached v-if="loading" class="rotate" />
@@ -89,7 +148,13 @@ export default {
       this.last_name_valid = this.last_name !== "";
       this.email_valid = this.email !== "";
       this.username_valid = this.username !== "";
-      this.form_valid = this.first_name_valid && this.last_name_valid && this.email_valid && this.username_valid
+      this.birth_date_valid = this.birth_date !== "";
+      this.height_valid = this.height !== "" && this.height !== null;
+      this.weight_valid = this.weight !== "" && this.weight !== null;
+      this.gender_valid = this.gender !== "";
+      this.description_valid = this.description !== "";
+
+      this.form_valid = this.first_name_valid && this.last_name_valid && this.email_valid && this.username_valid && this.birth_date_valid && this.height_valid && this.weight_valid && this.gender_valid && this.description_valid;
       if (this.form_valid) {
         const http = new Http();
         const response = await http.authPost("/patients", {
@@ -97,6 +162,11 @@ export default {
           email: this.email,
           first_name: this.first_name,
           last_name: this.last_name,
+          birth_date: this.birth_date,
+          height: parseFloat(this.height),
+          weight: parseFloat(this.weight),
+          gender: this.gender,
+          description: this.description
         });
         if (response.request.status === 201) {
           this.$router.push({ name: "patients" });
@@ -120,6 +190,16 @@ export default {
       email: '',
       username_valid: true,
       username: '',
+      birth_date_valid: true,
+      birth_date: '',
+      height_valid: true,
+      height: '',
+      weight_valid: true,
+      weight: '',
+      gender_valid: true,
+      gender: '',
+      description_valid: true,
+      description: '',
       loading: false,
       form_valid: true,
       error_msg: "",
@@ -172,7 +252,8 @@ export default {
     resize: none;
   }
   input,
-  textarea {
+  textarea,
+  select {
     margin-bottom: 10px;
     padding: 5px;
     padding-left: 10px;
@@ -181,7 +262,8 @@ export default {
     background-color: $light;
   }
   input.has-error,
-  textarea.has-error {
+  textarea.has-error,
+  select.has-error {
     border: 1px solid $danger;
   }
   input::placeholder,
