@@ -122,6 +122,10 @@
           <FileExcel class="action-icon" />
           <span>Exportar a Excel (CSV)</span>
         </button>
+        <button class="btn btn-dark" @click="exportRawCSV" :disabled="!hasResultsFlag">
+          <FileExcel class="action-icon" />
+          <span>Exportar CSV Crudo (33 puntos)</span>
+        </button>
         <button class="btn btn-primary" @click="$router.push(`/exercises/${exercise.id}/3d-viewer`)" :disabled="!hasResultsFlag">
           <Cube class="action-icon" />
           <span>Ver Análisis en 3D</span>
@@ -132,351 +136,126 @@
 </template>
 
 <script>
-import Http from '@/lib/http';
 import '@/styles/views/view_routine.scss';
-import { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel } from "mdue";
-import PoseLandmarkerService from '@/services/poseLandmarkerService';
+import { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel } from 'mdue';
 import { Chart, registerables } from 'chart.js';
+import PoseLandmarkerService   from '@/services/poseLandmarkerService';
+import ExerciseApiService      from '@/services/exerciseApiService';
+import MovementHistoryService  from '@/services/movementHistoryService';
+import ExerciseExportService   from '@/services/exerciseExportService';
+import ExerciseChartService    from '@/services/exerciseChartService';
 Chart.register(...registerables);
 
 export default {
   name: 'ViewExercise',
+
+  components: { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel },
+
   async beforeMount() {
-    await this.getExercise();
-    this.poseService = new PoseLandmarkerService();
-    await this.poseService.initialize();
-    this._movement_history_map = {};
-    this._processedSegments = new Set();
-    this._chartInstances = {};
-    this.loadHistoryFromStorage();
+    this._apiService     = new ExerciseApiService();
+    this._poseService    = new PoseLandmarkerService();
+    this._chartService   = new ExerciseChartService();
+
+    await this._loadExercise();
+    await this._poseService.initialize();
+    this._historyService = new MovementHistoryService(this.exercise.id);
+    this._loadHistory();
   },
-  components: {
-    VideoAccount,
-    RunFast,
-    Upload,
-    Download,
-    Fullscreen,
-    ChartLine,
-    Cube,
-    FileExcel
+
+  beforeUnmount() {
+    this._chartService.destroyAll();
   },
+
   computed: {
     hasResults() {
       return this.hasResultsFlag;
-    }
+    },
   },
+
   methods: {
-    async getExercise() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/exercises/${this.$route.params.exercise_id}`
-      );
+    // ─── Carga de datos ──────────────────────────────────────────────────────
+
+    async _loadExercise() {
+      const response = await this._apiService.getExercise(this.$route.params.exercise_id);
       if (response.status !== 404) {
         this.exercise = response.data;
-        this.status = this.exercise.status;
-        if (this.status === "Video procesado" || this.status === "Video en procesamiento") {
-          await this.getPointsTracked();
-          await this.getDifficulties();
+        const ready = this.exercise.status === 'Video procesado' || this.exercise.status === 'Video en procesamiento';
+        if (ready) {
+          await this._loadTrackedPoints();
+          await this._loadDifficulties();
         }
       }
     },
-    async getPointsTracked() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/exercises/${this.exercise.id}/points_tracked/`
-      );
+
+    async _loadTrackedPoints() {
+      const response = await this._apiService.getPointsTracked(this.exercise.id);
       if (response.status === 200) {
         this.tracked_points = response.data;
-        this._observed_results = {};
-        this.tracked_points.forEach(point => {
-          this._observed_results[point.codename] = { min: Infinity, max: -Infinity };
+        this._observedResults = {};
+        this.tracked_points.forEach(p => {
+          this._observedResults[p.codename] = { min: Infinity, max: -Infinity };
         });
       }
     },
-    refreshChartData() {
-      if (!this.showCharts) return;
-      const historyArr = this.getMovementHistoryArray();
-      const times = historyArr.map(frame => frame.t);
-      
-      for (const point of this.tracked_points) {
-        const chart = this._chartInstances && this._chartInstances[point.codename];
-        if (!chart) continue;
-        
-        chart.data.labels = times;
-        
-        let datasets = chart.data.datasets;
-        
-        if (this.chartType === 'posicion') {
-          const pointId = point.id;
-          const xs = [], ys = [], zs = [];
-          for (const frame of historyArr) {
-            const coords = frame.points[pointId];
-            if (coords) {
-              xs.push(coords[0]); ys.push(coords[1]); zs.push(coords[2]);
-            } else {
-              xs.push(null); ys.push(null); zs.push(null);
-            }
-          }
-          if (datasets[0]) datasets[0].data = xs;
-          if (datasets[1]) datasets[1].data = ys;
-          if (datasets[2]) datasets[2].data = zs;
-        } else {
-          const angles = [];
-          for (const frame of historyArr) {
-            angles.push(frame.angles && frame.angles[point.codename] !== undefined ? frame.angles[point.codename] : null);
-          }
-          if (datasets[0]) datasets[0].data = angles;
-        }
 
-        const stats = [];
-        for (const ds of datasets) {
-          const validData = ds.data.filter(v => v !== null && !isNaN(v));
-          if (validData.length > 0) {
-            const min = Math.min(...validData);
-            const max = Math.max(...validData);
-            const avg = validData.reduce((a, b) => a + b, 0) / validData.length;
-            stats.push({
-              label: ds.label.split('(')[0].trim(),
-              min: min.toFixed(2),
-              max: max.toFixed(2),
-              avg: avg.toFixed(2),
-              color: ds.borderColor
-            });
-          }
-        }
-        this.chartStats[point.codename] = stats;
-        
-        chart.update('none'); // Disable animation to keep UI highly performant
+    async _loadDifficulties() {
+      const response = await this._apiService.getDifficulties(this.exercise.id);
+      if (response.status === 200) this.difficulties = response.data;
+    },
+
+    _loadHistory() {
+      const loaded = this._historyService.loadFromStorage();
+      if (loaded) {
+        this.hasResultsFlag = this._historyService.hasFrames();
       }
     },
-    saveHistoryToStorage() {
-      if (!this.exercise || !this.exercise.id || !this._movement_history_map) return;
-      try {
-        const payload = {
-          map: this._movement_history_map,
-          segments: Array.from(this._processedSegments)
-        };
-        localStorage.setItem(`exercise_${this.exercise.id}_history`, JSON.stringify(payload));
-      } catch (e) {
-        console.warn('El historial de movimiento en caché es grande y puede que no quepa en localStorage.', e);
-      }
-    },
-    loadHistoryFromStorage() {
-      if (!this.exercise || !this.exercise.id) return;
-      const cached = localStorage.getItem(`exercise_${this.exercise.id}_history`);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.map && parsed.segments) {
-            this._movement_history_map = parsed.map;
-            this._processedSegments = new Set(parsed.segments);
-            this.hasResultsFlag = Object.keys(parsed.map).length > 0;
-          }
-        } catch (e) {
-          console.error('Error cargando historial de resguardo:', e);
-        }
-      }
-    },
+
+    // ─── Controles de video ──────────────────────────────────────────────────
+
     togglePlayPause() {
       const video = this.$refs.video;
-      if (video) {
-        if (video.paused) {
-          video.play();
-        } else {
-          video.pause();
-        }
+      if (!video) return;
+      video.paused ? video.play() : video.pause();
+    },
+
+    toggleFullScreen() {
+      const elem = this.$refs.videoContainer;
+      if (!elem) return;
+      if (!document.fullscreenElement) {
+        elem.requestFullscreen().catch(err => console.error('Error pantalla completa:', err));
+      } else {
+        document.exitFullscreen();
       }
     },
+
     calculateInitialProgress() {
       const video = this.$refs.video;
-      if (video && video.duration && this._processedSegments && this._processedSegments.size > 0) {
-        const totalSegments = Math.ceil(video.duration * 10);
-        this.analysisProgress = Math.min(100, Math.round((this._processedSegments.size / totalSegments) * 100));
+      if (video && video.duration) {
+        this.analysisProgress = this._historyService.calculateProgress(video.duration);
       }
     },
-    async getDifficulties() {
-      const http = new Http();
-      const response = await http.authGet(
-        `/exercises/${this.exercise.id}/difficulties/`
-      );
-      if (response.status === 200) {
-        this.difficulties = response.data;
-      }
-    },
-    exportToCSV() {
-      const historyArr = this.getMovementHistoryArray();
-      if (!historyArr || historyArr.length === 0) return;
 
-      const tracked = this.tracked_points || [];
-      
-      // Build CSV Headers
-      let headers = ['Tiempo (s)'];
-      for (const point of tracked) {
-        const name = point.verbose.replace(/"/g, '""'); // Escape double quotes just in case
-        headers.push(`"${name} X"`, `"${name} Y"`, `"${name} Z"`, `"${name} Ángulo (°)"`);
-      }
-      
-      let csvContent = headers.join(',') + '\n';
-      
-      // Build CSV Rows
-      for (const frame of historyArr) {
-        let row = [frame.t.toFixed(3)];
-        for (const point of tracked) {
-          const ptId = point.id;
-          const codename = point.codename;
-          const coords = frame.points[ptId];
-          
-          if (coords) {
-            row.push(coords[0].toFixed(4), coords[1].toFixed(4), coords[2].toFixed(4));
-          } else {
-            row.push('', '', '');
-          }
-          
-          const angle = frame.angles && frame.angles[codename] !== undefined ? frame.angles[codename] : '';
-          row.push(angle !== '' ? parseFloat(angle).toFixed(2) : '');
-        }
-        csvContent += row.join(',') + '\n';
-      }
-      
-      // Trigger File Download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const fileName = this.exercise.name ? this.exercise.name.replace(/\s+/g, '_') : 'ejercicio';
-      link.setAttribute('download', `datos_movimiento_${fileName}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    },
-    getMovementHistoryArray() {
-      if (!this._movement_history_map) return [];
-      return Object.values(this._movement_history_map).sort((a, b) => a.t - b.t);
-    },
-    generateCharts() {
-      this.showCharts = true;
-      
-      this.$nextTick(() => {
-        const historyArr = this.getMovementHistoryArray();
-        const times = historyArr.map(frame => frame.t);
-        
-        for (const point of this.tracked_points) {
-          const canvasId = 'chart-' + point.codename;
-          const canvas = document.getElementById(canvasId);
-          if (!canvas) continue;
-          
-          if (this._chartInstances && this._chartInstances[point.codename]) {
-            this._chartInstances[point.codename].destroy();
-          }
+    // ─── Loop de detección de pose ───────────────────────────────────────────
 
-          let datasets = [];
-          let yAxisTitle = '';
-
-          if (this.chartType === 'posicion') {
-            const pointId = point.id;
-            const xs = [];
-            const ys = [];
-            const zs = [];
-            
-            for (const frame of historyArr) {
-              const coords = frame.points[pointId];
-              if (coords) {
-                xs.push(coords[0]);
-                ys.push(coords[1]);
-                zs.push(coords[2]);
-              } else {
-                xs.push(null); ys.push(null); zs.push(null);
-              }
-            }
-            datasets = [
-              { label: 'Eje X (Ancho)', data: xs, borderColor: '#FF6384', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-              { label: 'Eje Y (Alto)', data: ys, borderColor: '#36A2EB', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-              { label: 'Eje Z (Prof)', data: zs, borderColor: '#4BC0C0', borderWidth: 2, pointRadius: 0, tension: 0.1 }
-            ];
-            yAxisTitle = 'Coordenada Normalizada';
-          } else {
-            const angles = [];
-            for (const frame of historyArr) {
-              const ang = frame.angles && frame.angles[point.codename] !== undefined ? frame.angles[point.codename] : null;
-              angles.push(ang);
-            }
-            datasets = [
-              { label: 'Ángulo (Grados)', data: angles, borderColor: '#9966FF', borderWidth: 2, pointRadius: 0, tension: 0.1 }
-            ];
-            yAxisTitle = 'Grados (°)';
-          }
-
-          const stats = [];
-          for (const ds of datasets) {
-            const validData = ds.data.filter(v => v !== null && !isNaN(v));
-            if (validData.length > 0) {
-              const min = Math.min(...validData);
-              const max = Math.max(...validData);
-              const avg = validData.reduce((a, b) => a + b, 0) / validData.length;
-              stats.push({
-                label: ds.label.split('(')[0].trim(),
-                min: min.toFixed(2),
-                max: max.toFixed(2),
-                avg: avg.toFixed(2),
-                color: ds.borderColor
-              });
-            }
-          }
-          this.chartStats[point.codename] = stats;
-          
-          if (!this._chartInstances) this._chartInstances = {};
-          this._chartInstances[point.codename] = new Chart(canvas, {
-            type: 'line',
-            data: {
-              labels: times,
-              datasets: datasets
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              animation: false,
-              interaction: { mode: 'index', intersect: false },
-              plugins: { legend: { position: 'top' } },
-              scales: {
-                x: { title: { display: true, text: 'Tiempo (segundos)' } },
-                y: { title: { display: true, text: yAxisTitle } }
-              }
-            }
-          });
-        }
-      });
-    },
     startDetection() {
-      const video = this.$refs.video;
+      const video  = this.$refs.video;
       const canvas = this.$refs.canvas;
       if (!video || !canvas) return;
 
-      canvas.width = video.videoWidth;
+      canvas.width  = video.videoWidth;
       canvas.height = video.videoHeight;
-      this.poseService.createDrawingUtils(canvas.getContext('2d'));
-
-      if (!this._movement_history_map) {
-        this._movement_history_map = {};
-        this._processedSegments = new Set();
-        this.analysisProgress = 0;
-      }
+      this._poseService.createDrawingUtils(canvas.getContext('2d'));
 
       const processFrame = async (now, metadata) => {
         if (!video || video.paused || video.ended) return;
-
         try {
           const timestamp = metadata ? metadata.mediaTime * 1000 : performance.now();
-          await this.poseService.detectForVideo(
-            video,
-            canvas,
-            timestamp,
-            this.tracked_points,
-            this.updateResults
+          await this._poseService.detectForVideo(
+            video, canvas, timestamp, this.tracked_points, this._onPoseDetected
           );
         } catch (e) {
-          console.error("Error en renderLoop:", e);
+          console.error('Error en renderLoop:', e);
         }
-
         if (video.requestVideoFrameCallback) {
           video.requestVideoFrameCallback(processFrame);
         } else {
@@ -490,116 +269,105 @@ export default {
         requestAnimationFrame(processFrame);
       }
     },
+
     stopDetection() {},
-    toggleFullScreen() {
-      const elem = this.$refs.videoContainer;
-      if (!elem) return;
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen().catch(err => {
-          console.error("Error al intentar iniciar pantalla completa:", err);
-        });
-      } else {
-        document.exitFullscreen();
-      }
-    },
-    updateResults(currentAngles, currentCoords) {
+
+    // ─── Callback de resultados de pose ──────────────────────────────────────
+
+    _onPoseDetected(currentAngles, currentCoords) {
       const video = this.$refs.video;
       const currentTime = video ? video.currentTime : 0;
-      
-      let gotNewResults = false;
+
+      // Actualizar min/max observados
       for (const codename in currentAngles) {
         const angle = currentAngles[codename];
-        if (this._observed_results && this._observed_results[codename]) {
-          if (angle < this._observed_results[codename].min) this._observed_results[codename].min = angle;
-          if (angle > this._observed_results[codename].max) this._observed_results[codename].max = angle;
-          gotNewResults = true;
-        }
-      }
-      
-      if (gotNewResults && !this.hasResultsFlag) {
-        this.hasResultsFlag = true;
-      }
-
-      const key = currentTime.toFixed(2);
-      this._movement_history_map[key] = {
-        t: parseFloat(currentTime.toFixed(4)),
-        points: currentCoords,
-        angles: currentAngles
-      };
-
-      const segment = Math.floor(currentTime * 10);
-      if (!this._processedSegments) this._processedSegments = new Set();
-      this._processedSegments.add(segment);
-      
-      if (video && video.duration) {
-        const totalSegments = Math.ceil(video.duration * 10);
-        const progress = Math.min(100, Math.round((this._processedSegments.size / totalSegments) * 100));
-        if (this.analysisProgress !== progress) {
-          this.analysisProgress = progress;
+        if (this._observedResults?.[codename]) {
+          if (angle < this._observedResults[codename].min) this._observedResults[codename].min = angle;
+          if (angle > this._observedResults[codename].max) this._observedResults[codename].max = angle;
         }
       }
 
-      const nowTime = Date.now();
-      if (nowTime - (this._lastSaveTime || 0) > 3000) {
-        this.saveHistoryToStorage();
-        this._lastSaveTime = nowTime;
+      // Delegar al servicio de historial
+      const { progress, isFirstResult } = this._historyService.addFrame(
+        currentTime, currentAngles, currentCoords, video?.duration
+      );
+
+      if (isFirstResult) this.hasResultsFlag = true;
+      if (this.analysisProgress !== progress) this.analysisProgress = progress;
+
+      // Persistir periódicamente
+      const now = Date.now();
+      if (now - (this._lastSaveTime || 0) > 3000) {
+        this._historyService.saveToStorage();
+        this._lastSaveTime = now;
       }
 
-      if (this.showCharts && nowTime - (this._lastChartUpdate || 0) > 500) {
-        this.refreshChartData();
-        this._lastChartUpdate = nowTime;
+      // Actualizar gráficas en vivo
+      if (this.showCharts && now - (this._lastChartUpdate || 0) > 500) {
+        const stats = this._chartService.refreshCharts(
+          this.tracked_points, this._historyService.getHistoryArray(), this.chartType
+        );
+        this.chartStats = { ...this.chartStats, ...stats };
+        this._lastChartUpdate = now;
       }
     },
-    downloadMovementJSON() {
-      const dataStr = JSON.stringify({
-        exercise_id: this.exercise.id,
-        exercise_name: this.exercise.name,
-        duration: this.$refs.video.duration,
-        frames: this.getMovementHistoryArray()
+
+    // ─── Gráficas ────────────────────────────────────────────────────────────
+
+    generateCharts() {
+      this.showCharts = true;
+      this.$nextTick(() => {
+        this.chartStats = this._chartService.buildCharts(
+          this.tracked_points, this._historyService.getHistoryArray(), this.chartType
+        );
       });
-
-      const blob = new Blob([dataStr], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `movimiento_${this.exercise.name.replace(/\s+/g, '_')}_${Date.now()}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
     },
-    async sendResults() {
-      if (!this._observed_results) return;
-      
-      const resultsPayload = {
-        error: false,
-        results: {
-          points: Object.entries(this._observed_results).map(([center, data]) => ({
-            center: center,
-            max_angle: data.max === -Infinity ? 0 : parseFloat(data.max.toFixed(2)),
-            min_angle: data.min === Infinity ? 0 : parseFloat(data.min.toFixed(2))
-          }))
-        }
-      };
 
-      const http = new Http();
+    // ─── Exportaciones ───────────────────────────────────────────────────────
+
+    exportToCSV() {
+      ExerciseExportService.exportTrackedCSV(
+        this._historyService.getHistoryArray(), this.tracked_points, this.exercise.name
+      );
+    },
+
+    exportRawCSV() {
+      ExerciseExportService.exportRawCSV(
+        this._historyService.getHistoryArray(), this.exercise.name
+      );
+    },
+
+    downloadMovementJSON() {
+      ExerciseExportService.exportMovementJSON(
+        this.exercise, this.$refs.video?.duration, this._historyService.getHistoryArray()
+      );
+    },
+
+    // ─── Envío de resultados ─────────────────────────────────────────────────
+
+    async sendResults() {
+      if (!this._observedResults) return;
       try {
-        const response = await http.authPost(`/exercises/${this.exercise.id}/video_results/`, resultsPayload);
-        if (response.status === 200 || response.status === 201) alert("Resultados enviados correctamente");
+        const response = await this._apiService.sendResults(this.exercise.id, this._observedResults);
+        if (response.status === 200 || response.status === 201) {
+          alert('Resultados enviados correctamente');
+        }
       } catch (error) {
-        console.error("Error en la petición:", error);
+        console.error('Error enviando resultados:', error);
       }
-    }
+    },
   },
+
   data() {
     return {
       exercise: {},
       tracked_points: [],
       difficulties: [],
-      poseService: null,
       hasResultsFlag: false,
       showCharts: false,
       chartStats: {},
       analysisProgress: 0,
-      chartType: 'posicion'
+      chartType: 'posicion',
     };
   },
 };
