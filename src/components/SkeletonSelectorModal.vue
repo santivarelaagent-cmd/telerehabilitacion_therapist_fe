@@ -4,58 +4,148 @@
       <div class="modal-wrapper">
         <div class="modal-container">
           <div class="modal-header">
-            <h3>Seleccionar Puntos a Rastrear</h3>
-            <button class="close-btn" @click="close">&times;</button>
+            <div class="header-title-area">
+              <h3>Configurador Visual de Ángulos</h3>
+              <p class="subtitle">Selecciona los puntos y personaliza sus conexiones adyacentes en tiempo real</p>
+            </div>
+            <button type="button" class="close-btn" @click="close">&times;</button>
           </div>
 
-          <div class="modal-body">
-            <p class="instruction">
-              Haz clic sobre los círculos del esqueleto para seleccionar los puntos que deseas seguir durante el ejercicio.
-            </p>
-            
-            <div class="svg-container">
-              <svg viewBox="0 0 100 160" class="skeleton-svg">
-                <!-- Lines -->
-                <line 
-                  v-for="(conn, idx) in POSE_CONNECTIONS" 
-                  :key="'line-'+idx"
-                  :x1="points[conn[0]].x" :y1="points[conn[0]].y"
-                  :x2="points[conn[1]].x" :y2="points[conn[1]].y"
-                  class="bone-line"
-                />
+          <div class="modal-body-layout">
+            <!-- Columna Izquierda: Esqueleto SVG Interactivo -->
+            <div class="column-left">
+              <div class="svg-container">
+                <svg viewBox="0 0 100 160" class="skeleton-svg">
+                  <!-- Líneas estáticas de fondo (conexiones estándar) -->
+                  <line 
+                    v-for="(conn, idx) in POSE_CONNECTIONS" 
+                    :key="'line-'+idx"
+                    :x1="points[conn[0]].x" :y1="points[conn[0]].y"
+                    :x2="points[conn[1]].x" :y2="points[conn[1]].y"
+                    class="bone-line"
+                  />
 
-                <!-- Points -->
-                <circle
-                  v-for="(pt, idx) in points"
-                  :key="'pt-'+idx"
-                  :cx="pt.x" :cy="pt.y"
-                  :r="isSelected(idx) ? 3 : 2"
-                  :class="['joint-circle', { 'selected': isSelected(idx) }]"
-                  @click="togglePoint(idx)"
-                >
-                  <title>{{ getPointName(idx) }}</title>
-                </circle>
-              </svg>
+                  <!-- Líneas de ángulo dinámicas para el punto activo -->
+                  <g v-if="activePoint">
+                    <!-- Conexión a Izquierdo (Azul) -->
+                    <line 
+                      v-if="activePoint.left_point_id !== null && points[activePoint.left_point_id]"
+                      :x1="points[activePoint.skeleton_point_id].x" :y1="points[activePoint.skeleton_point_id].y"
+                      :x2="points[activePoint.left_point_id].x" :y2="points[activePoint.left_point_id].y"
+                      class="dynamic-line left-conn-line"
+                    />
+                    <!-- Conexión a Derecho (Rojo/Naranja) -->
+                    <line 
+                      v-if="activePoint.right_point_id !== null && points[activePoint.right_point_id]"
+                      :x1="points[activePoint.skeleton_point_id].x" :y1="points[activePoint.skeleton_point_id].y"
+                      :x2="points[activePoint.right_point_id].x" :y2="points[activePoint.right_point_id].y"
+                      class="dynamic-line right-conn-line"
+                    />
+                  </g>
+
+                  <!-- Círculos de los Puntos -->
+                  <circle
+                    v-for="(pt, idx) in points"
+                    :key="'pt-'+idx"
+                    :cx="pt.x" :cy="pt.y"
+                    :r="getCircleRadius(idx)"
+                    :class="getCircleClass(idx)"
+                    @click="handlePointClick(idx)"
+                  >
+                    <title>{{ getPointName(idx) }}</title>
+                  </circle>
+                </svg>
+              </div>
+
+              <!-- Mini leyenda de colores -->
+              <div class="legend-box" v-if="activePoint">
+                <span class="legend-item"><span class="dot active-dot"></span> Centro</span>
+                <span class="legend-item"><span class="dot left-dot"></span> Izq.</span>
+                <span class="legend-item"><span class="dot right-dot"></span> Der.</span>
+              </div>
             </div>
 
-            <div class="chips-container">
-              <span v-if="localSelected.length === 0" class="light-italic-font muted-text">
-                No hay puntos seleccionados
-              </span>
-              <div 
-                v-for="ptId in localSelected" 
-                :key="'chip-'+ptId" 
-                class="chip"
-              >
-                {{ getPointName(ptId) }}
-                <span class="chip-close" @click="togglePoint(ptId)">&times;</span>
+            <!-- Columna Derecha: Panel de Configuración -->
+            <div class="column-right">
+              <!-- Selector de Pestañas / Puntos Activos -->
+              <div class="points-tabs-container">
+                <label class="section-label">Puntos a Rastrear</label>
+                <div class="points-tabs">
+                  <button 
+                    type="button"
+                    v-for="entry in localSelected" 
+                    :key="'tab-'+entry.skeleton_point_id"
+                    :class="['tab-btn', { 'active': activePointId === entry.skeleton_point_id }]"
+                    @click="setActivePoint(entry.skeleton_point_id)"
+                  >
+                    {{ getPointName(entry.skeleton_point_id) }}
+                    <span class="tab-remove" @click.stop="togglePoint(entry.skeleton_point_id)">&times;</span>
+                  </button>
+                  <span v-if="localSelected.length === 0" class="no-points-placeholder">
+                    Haz clic en el esqueleto para añadir puntos
+                  </span>
+                </div>
+              </div>
+
+              <!-- Detalle de configuración del punto activo -->
+              <div class="active-config-panel" v-if="activePoint">
+                <div class="panel-header">
+                  <span class="badge">Configurando Ángulo</span>
+                  <h4>{{ getPointName(activePoint.skeleton_point_id) }}</h4>
+                </div>
+
+                <div class="config-cards">
+                  <!-- Tarjeta Izquierda -->
+                  <div class="config-card left-card">
+                    <div class="card-title">
+                      <span class="color-indicator left-indicator"></span>
+                      Punto Adyacente Izquierdo
+                    </div>
+                    <select v-model="activePoint.left_point_id" class="styled-select">
+                      <option :value="null">— Ninguno / Por defecto —</option>
+                      <option 
+                        v-for="sp in availablePoints" 
+                        :key="'left-'+sp.id" 
+                        :value="sp.id"
+                      >{{ sp.verbose || sp.label || sp.codename }}</option>
+                    </select>
+                  </div>
+
+                  <!-- Tarjeta Derecha -->
+                  <div class="config-card right-card">
+                    <div class="card-title">
+                      <span class="color-indicator right-indicator"></span>
+                      Punto Adyacente Derecho
+                    </div>
+                    <select v-model="activePoint.right_point_id" class="styled-select">
+                      <option :value="null">— Ninguno / Por defecto —</option>
+                      <option 
+                        v-for="sp in availablePoints" 
+                        :key="'right-'+sp.id" 
+                        :value="sp.id"
+                      >{{ sp.verbose || sp.label || sp.codename }}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <p class="config-tip">
+                  💡 Las líneas de colores en el esqueleto muestran la articulación actual. Puedes cambiarlas arriba.
+                </p>
+              </div>
+
+              <div class="welcome-panel" v-else>
+                <div class="welcome-content">
+                  <div class="icon">🎯</div>
+                  <h4>No hay punto activo</h4>
+                  <p>Selecciona un punto en el esqueleto de la izquierda o en la lista superior para personalizar su medición de ángulos.</p>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="close">Cancelar</button>
-            <button class="btn btn-success" @click="confirmSelection">Guardar Selección</button>
+            <button type="button" class="btn btn-secondary" @click="close">Cancelar</button>
+            <button type="button" class="btn btn-success" @click="confirmSelection">Guardar Configuración</button>
           </div>
         </div>
       </div>
@@ -79,12 +169,13 @@ export default {
     },
     availablePoints: {
       type: Array,
-      default: () => [] // The verbose mapping from API
+      default: () => []
     }
   },
   data() {
     return {
-      localSelected: [],
+      localSelected: [], // Array de { skeleton_point_id, left_point_id, right_point_id }
+      activePointId: null, // ID del punto seleccionado actualmente para editar
       POSE_CONNECTIONS,
       points: [
         { x: 50, y: 10 }, // 0: nose
@@ -123,35 +214,108 @@ export default {
       ]
     };
   },
+  computed: {
+    activePoint() {
+      return this.localSelected.find(e => e.skeleton_point_id === this.activePointId) || null;
+    }
+  },
   watch: {
     visible(newVal) {
       if (newVal) {
-        this.localSelected = [...this.initialSelected];
+        this.localSelected = this.normalizeInitial(this.initialSelected);
+        if (this.localSelected.length > 0) {
+          this.activePointId = this.localSelected[0].skeleton_point_id;
+        } else {
+          this.activePointId = null;
+        }
       }
     }
   },
   methods: {
+    normalizeInitial(arr) {
+      return (arr || []).map(item => {
+        if (typeof item === 'number') {
+          const defaults = this.getDefaultAdjacents(item);
+          return {
+            skeleton_point_id: item,
+            left_point_id: defaults.left,
+            right_point_id: defaults.right
+          };
+        }
+        return {
+          skeleton_point_id: item.skeleton_point_id,
+          left_point_id: item.left_point_id ?? null,
+          right_point_id: item.right_point_id ?? null
+        };
+      });
+    },
+    getDefaultAdjacents(pointId) {
+      const sp = this.availablePoints.find(p => p.id === pointId);
+      return {
+        left: sp ? (sp.left_point ?? sp.left_point_id ?? null) : null,
+        right: sp ? (sp.right_point ?? sp.right_point_id ?? null) : null
+      };
+    },
     close() {
       this.$emit('update:visible', false);
     },
     confirmSelection() {
-      this.$emit('saved', this.localSelected);
+      this.$emit('saved', [...this.localSelected]);
       this.close();
     },
     isSelected(idx) {
-      return this.localSelected.includes(idx);
+      return this.localSelected.some(e => e.skeleton_point_id === idx);
+    },
+    handlePointClick(idx) {
+      // Toggle o seleccionar punto activo
+      const isSel = this.isSelected(idx);
+      if (!isSel) {
+        const defaults = this.getDefaultAdjacents(idx);
+        this.localSelected.push({
+          skeleton_point_id: idx,
+          left_point_id: defaults.left,
+          right_point_id: defaults.right
+        });
+      }
+      this.activePointId = idx;
     },
     togglePoint(idx) {
-      const pos = this.localSelected.indexOf(idx);
+      const pos = this.localSelected.findIndex(e => e.skeleton_point_id === idx);
       if (pos > -1) {
         this.localSelected.splice(pos, 1);
-      } else {
-        this.localSelected.push(idx);
+        if (this.activePointId === idx) {
+          this.activePointId = this.localSelected.length > 0 ? this.localSelected[0].skeleton_point_id : null;
+        }
       }
+    },
+    setActivePoint(idx) {
+      this.activePointId = idx;
     },
     getPointName(idx) {
       const match = this.availablePoints.find(p => p.id === idx || p.value === idx);
       return match ? (match.verbose || match.label) : `Punto ${idx}`;
+    },
+
+    // Métodos dinámicos para estilizar los puntos en el SVG
+    getCircleRadius(idx) {
+      if (this.activePointId === idx) return 4;
+      if (this.activePoint && this.activePoint.left_point_id === idx) return 3;
+      if (this.activePoint && this.activePoint.right_point_id === idx) return 3;
+      if (this.isSelected(idx)) return 3;
+      return 1.8;
+    },
+    getCircleClass(idx) {
+      const classes = ['joint-circle'];
+      if (this.activePointId === idx) {
+        classes.push('active-center');
+      } else if (this.activePoint && this.activePoint.left_point_id === idx) {
+        classes.push('active-left');
+      } else if (this.activePoint && this.activePoint.right_point_id === idx) {
+        classes.push('active-right');
+      } else if (this.isSelected(idx)) {
+        classes.push('selected');
+      }
+      return classes;
     }
   }
 };
@@ -165,7 +329,8 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   transition: opacity 0.3s ease;
   align-items: center;
@@ -173,165 +338,458 @@ export default {
 }
 
 .modal-container {
-  width: 90%;
-  max-width: 500px;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 95%;
+  max-width: 820px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   max-height: 90vh;
-  font-family: 'Open Sans', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  overflow: hidden;
 }
 
 .modal-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid #eee;
+  padding: 20px 28px;
+  border-bottom: 1px solid #f1f5f9;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   position: relative;
+  background: #f8fafc;
 }
 
-.modal-header h3 {
+.header-title-area h3 {
   margin: 0;
-  color: #333;
-  font-size: 1.2rem;
-  text-align: center;
+  color: #0f172a;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.header-title-area .subtitle {
+  margin: 4px 0 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   cursor: pointer;
-  color: #aaa;
-  position: absolute;
-  right: 24px;
+  color: #94a3b8;
+  transition: color 0.2s;
 }
 
 .close-btn:hover {
-  color: #333;
+  color: #475569;
 }
 
-.modal-body {
-  padding: 20px 24px;
-  overflow-y: auto;
+/* Layout bidireccional en dos columnas */
+.modal-body-layout {
+  display: flex;
+  flex-direction: row;
+  height: 520px;
+  overflow: hidden;
+}
+
+/* Columna Izquierda: Visualización */
+.column-left {
+  width: 42%;
+  border-right: 1px solid #f1f5f9;
+  background: #fafbfd;
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.instruction {
-  font-size: 0.9rem;
-  color: #666;
-  text-align: center;
-  margin-bottom: 20px;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
 }
 
 .svg-container {
   width: 100%;
-  max-width: 250px;
-  background: #f4f7f6;
-  border-radius: 12px;
-  padding: 20px 0;
-  box-shadow: inset 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.skeleton-svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.bone-line {
-  stroke: #ccc;
-  stroke-width: 1;
-}
-
-.joint-circle {
-  fill: #fff;
-  stroke: #4BC0C0;
-  stroke-width: 1;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.joint-circle:hover {
-  fill: #e0f7fa;
-  stroke-width: 1.5;
-}
-
-.joint-circle.selected {
-  fill: #FF3366;
-  stroke: #FF3366;
-  r: 3;
-}
-
-.chips-container {
-  margin-top: 20px;
-  width: 100%;
+  height: 100%;
+  max-height: 420px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-height: 40px;
   align-items: center;
   justify-content: center;
 }
 
-.chip {
-  background-color: #4BC0C0;
-  color: white;
-  padding: 4px 10px;
-  border-radius: 4px;
+.skeleton-svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+.bone-line {
+  stroke: #cbd5e1;
+  stroke-width: 0.8;
+  stroke-linecap: round;
+}
+
+/* Líneas dinámicas de medición de ángulo */
+.dynamic-line {
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 3 2;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.left-conn-line {
+  stroke: #3b82f6; /* Azul */
+}
+
+.right-conn-line {
+  stroke: #f97316; /* Naranja */
+}
+
+.joint-circle {
+  fill: #ffffff;
+  stroke: #94a3b8;
+  stroke-width: 0.8;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.joint-circle:hover {
+  fill: #f1f5f9;
+  stroke: #475569;
+  r: 3;
+}
+
+.joint-circle.selected {
+  fill: #0ea5e9;
+  stroke: #0284c7;
+  stroke-width: 1.5;
+}
+
+/* Clases de colores dinámicos del punto activo */
+.joint-circle.active-center {
+  fill: #10b981; /* Verde */
+  stroke: #047857;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
+}
+
+.joint-circle.active-left {
+  fill: #3b82f6; /* Azul */
+  stroke: #1d4ed8;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.6));
+}
+
+.joint-circle.active-right {
+  fill: #f97316; /* Naranja */
+  stroke: #c2410c;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6));
+}
+
+/* Leyenda de colores */
+.legend-box {
+  display: flex;
+  gap: 12px;
+  background: #ffffff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  margin-top: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.active-dot { background-color: #10b981; }
+.left-dot { background-color: #3b82f6; }
+.right-dot { background-color: #f97316; }
+
+/* Columna Derecha: Panel de Configuración */
+.column-right {
+  width: 58%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.section-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Tabs horizontales para los puntos seleccionados */
+.points-tabs-container {
+  margin-bottom: 24px;
+}
+
+.points-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  min-height: 48px;
+  align-items: center;
+  padding: 8px;
+}
+
+.tab-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 8px;
   font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
   display: flex;
   align-items: center;
   gap: 6px;
-  font-weight: 600;
-  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
 }
 
-.chip-close {
-  cursor: pointer;
+.tab-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.tab-btn.active {
+  background: #0ea5e9;
+  color: #ffffff;
+  border-color: #0ea5e9;
+}
+
+.tab-remove {
   font-weight: bold;
   font-size: 1.1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
   line-height: 1;
-  opacity: 0.8;
 }
 
-.chip-close:hover {
+.tab-remove:hover {
   opacity: 1;
 }
 
+.no-points-placeholder {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-style: italic;
+  padding-left: 8px;
+}
+
+/* Panel de Configuración Activa */
+.active-config-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-header {
+  margin-bottom: 20px;
+}
+
+.panel-header h4 {
+  margin: 4px 0 0 0;
+  font-size: 1.3rem;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.badge {
+  font-size: 0.7rem;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+
+.config-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.25s;
+}
+
+.config-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.left-card {
+  border-left: 4px solid #3b82f6;
+}
+
+.right-card {
+  border-left: 4px solid #f97316;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 12px;
+}
+
+.color-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.left-indicator { background-color: #3b82f6; }
+.right-indicator { background-color: #f97316; }
+
+.styled-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.styled-select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.config-tip {
+  margin-top: auto;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.4;
+  background: #f8fafc;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px dashed #e2e8f0;
+}
+
+/* Panel de bienvenida / Vacío */
+.welcome-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #e2e8f0;
+  border-radius: 16px;
+  background: #fafbfd;
+  padding: 30px;
+  text-align: center;
+}
+
+.welcome-content .icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+
+.welcome-content h4 {
+  margin: 0 0 8px 0;
+  color: #334155;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.welcome-content p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* Footer */
 .modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #eee;
+  padding: 18px 28px;
+  border-top: 1px solid #f1f5f9;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  background: #f8fafc;
 }
 
 .btn {
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
   border: none;
   font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
 .btn-secondary {
-  background: #e0e0e0;
-  color: #333;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.btn-secondary:hover {
+  background: #cbd5e1;
 }
 
 .btn-success {
-  background: #4BC0C0;
+  background: #0ea5e9;
   color: white;
 }
 
-/* Transitions */
+.btn-success:hover {
+  background: #0284c7;
+}
+
+/* Transiciones del Modal */
 .modal-enter-active, .modal-leave-active {
   transition: opacity 0.3s ease;
 }

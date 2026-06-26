@@ -109,16 +109,16 @@
                 <span v-if="selected_points.length === 0" class="light-italic-font muted-text" style="grid-column: 1 / -1;">
                   Ningún punto seleccionado.
                 </span>
-                <div v-for="ptId in selected_points" :key="'main-chip-'+(ptId.value || ptId)" style="background-color: #4BC0C0; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600; border: none; overflow: hidden;">
-                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ getPointName(ptId.value || ptId) }}</span>
-                  <span style="cursor: pointer; font-weight: bold; font-size: 1.1rem; opacity: 0.8; flex-shrink: 0;" @click="removePoint(ptId.value || ptId)">&times;</span>
+                <div v-for="entry in selected_points" :key="'main-chip-'+entry.skeleton_point_id" style="background-color: #4BC0C0; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600; border: none; overflow: hidden;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ getPointName(entry.skeleton_point_id) }}</span>
+                  <span style="cursor: pointer; font-weight: bold; font-size: 1.1rem; opacity: 0.8; flex-shrink: 0;" @click="removePoint(entry.skeleton_point_id)">&times;</span>
                 </div>
               </div>
 
               <SkeletonSelectorModal 
                 :visible="isModalVisible" 
                 @update:visible="isModalVisible = $event"
-                :initialSelected="selected_points.map(p => p.value || p)"
+                :initialSelected="selected_points"
                 :availablePoints="skeleton_points"
                 @saved="onPointsSaved"
               />
@@ -162,11 +162,11 @@ export default {
       this.selected_points = points;
     },
     removePoint(id) {
-      this.selected_points = this.selected_points.filter(p => (p.value || p) !== id);
+      this.selected_points = this.selected_points.filter(p => p.skeleton_point_id !== id);
     },
-    getPointName(idx) {
-      const match = this.skeleton_points.find(p => p.id === idx || p.value === idx);
-      return match ? (match.verbose || match.label) : `Punto ${idx}`;
+    getPointName(pointId) {
+      const match = this.skeleton_points.find(p => p.id === pointId || p.value === pointId);
+      return match ? (match.verbose || match.label) : `Punto ${pointId}`;
     },
     videoChanged(e) {
       console.log(e.target.files[0])
@@ -199,10 +199,7 @@ export default {
         this.description = this.exercise.description
         this.order = this.exercise.order
         this.status = this.exercise.status
-        if (this.status === 'Video procesado') {
-          console.log("video procesado")
-          await this.getPointsTracked()
-        }
+        await this.getPointsTracked()
       } else {
         console.log('TODO: route to 404')
       }
@@ -236,11 +233,43 @@ export default {
         return
       }
       this.tracked_points = response.data
+      // Mapear los puntos rastreados a objetos ricos para el selector
+      this.selected_points = response.data.map(pt => ({
+        skeleton_point_id: pt.id,
+        left_point_id: pt.left_point ?? null,
+        right_point_id: pt.right_point ?? null
+      }))
+    },
+    pointsHaveChanged() {
+      if (this.selected_points.length !== this.tracked_points.length) return true;
+      for (const sel of this.selected_points) {
+        const match = this.tracked_points.find(tp => tp.id === sel.skeleton_point_id);
+        if (!match) return true;
+
+        const selLeft = sel.left_point_id ?? null;
+        const selRight = sel.right_point_id ?? null;
+        const matchLeft = match.left_point ?? null;
+        const matchRight = match.right_point ?? null;
+
+        if (selLeft !== matchLeft || selRight !== matchRight) return true;
+      }
+      return false;
     },
     async saveExercise() {
       this.loading = true
       try {
-        if (this.formHasChanged()) {
+        const metaChanged = this.formHasChanged()
+        const ptsChanged = this.pointsHaveChanged()
+        const videoChanged = !!this.video
+
+        if (!metaChanged && !ptsChanged && !videoChanged) {
+          console.log('No changes detected, returning')
+          this.$router.push({ name: 'exercises' })
+          return
+        }
+
+        // Validación de metadatos si han cambiado
+        if (metaChanged) {
           this.name_valid = this.name !== ''
           this.description_valid = this.description !== ''
           this.routine_valid = this.routine !== ''
@@ -256,49 +285,37 @@ export default {
             this.loading = false
             return
           }
-
-          const meta = {
-            name: this.name,
-            description: this.description,
-            routine_id: parseInt(this.routine),
-            order: this.order,
-            is_model: this.is_model,
-          }
-
-          const result = await ExerciseService.saveExercise({
-            exerciseId: this.$route.params.exercise_id,
-            metadata: meta,
-            useFirebase: true, // cambiar según preferencia
-          })
-
-          if (result.ok) {
-            this.$router.push({ name: 'exercises' })
-          } else {
-            this.error_msg = `Error en ${result.step}`
-          }
-          this.loading = false
-          return
         }
-        console.log('no changes')
-        console.log(this.selected_points)
 
-        if (this.video) {
-          console.log(this.selected_points)
-          console.log(typeof this.selected_points)
+        const meta = metaChanged ? {
+          name: this.name,
+          description: this.description,
+          routine_id: parseInt(this.routine),
+          order: this.order,
+          is_model: this.is_model,
+        } : null
 
-          const points = (this.selected_points || [])
-            .map((p) => p.value ?? p)
-            .join(',')
-          const result = await ExerciseService.saveExercise({
-            exerciseId: this.$route.params.exercise_id,
-            file: this.video,
-            points,
-            useFirebase: true,
-            onProgress: (pct) => (this.uploadProgress = pct),
-          })
-          if (!result.ok) {
-            this.error_msg = 'Error al subir el video'
-          }
+        // Preparar puntos en formato JSON array
+        const points = (ptsChanged || videoChanged) ? (this.selected_points || []).map(p => ({
+          skeleton_point_id: p.skeleton_point_id,
+          left_point_id: p.left_point_id ?? null,
+          right_point_id: p.right_point_id ?? null
+        })) : null
+
+        const result = await ExerciseService.saveExercise({
+          exerciseId: this.$route.params.exercise_id,
+          metadata: meta,
+          file: this.video,
+          points: points,
+          existingVideoUrl: (ptsChanged && !videoChanged) ? this.exercise.video : null,
+          useFirebase: true,
+          onProgress: (pct) => (this.uploadProgress = pct),
+        })
+
+        if (result.ok) {
+          this.$router.push({ name: 'exercises' })
+        } else {
+          this.error_msg = `Error en ${result.step}`
         }
       } catch (error) {
         console.error('saveExercise error', error)
