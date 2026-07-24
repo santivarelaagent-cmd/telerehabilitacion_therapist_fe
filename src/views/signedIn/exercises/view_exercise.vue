@@ -9,91 +9,35 @@
       <div class="video-wrapper">
         <h3 class="regular-font dark-text">Estado del video de ayuda:</h3>
         <p class="light-font dark-text">{{ exercise.status }}</p>
+        
         <template v-if="exercise.status=== 'Video procesado' || exercise.status === 'Video en procesamiento'">
           <h3 class="regular-font dark-text">Video subido:</h3>
-          <div ref="videoContainer" style="position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #000; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
-            <video
-              ref="video"
-              :src="exercise.video"
-              controls
-              controlsList="nofullscreen"
-              crossorigin="anonymous"
-              @loadedmetadata="calculateInitialProgress"
-              @durationchange="calculateInitialProgress"
-              @canplay="calculateInitialProgress"
-              @play="startDetection"
-              @pause="stopDetection"
-              @ended="stopDetection"
-              @seeked="detectSingleFrame"
-              style="width: 100%; max-height: 100vh; object-fit: contain; z-index: 1;"
-            ></video>
-            <canvas
-              ref="canvas"
-              style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; pointer-events: none; z-index: 2;"
-            ></canvas>
-            <div @click="togglePlayPause" style="position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - 60px); z-index: 5; cursor: pointer;" title="Pausar / Reanudar"></div>
-            <button @click="toggleFullScreen" class="floating-fullscreen-btn" title="Pantalla Completa">
-              <Fullscreen />
-            </button>
-            <button @click="toggleSkeleton" :class="['floating-skeleton-btn', { active: showSkeleton }]" :title="showSkeleton ? 'Ocultar Esqueleto' : 'Mostrar Esqueleto'">
-              <Human />
-            </button>
-            <button @click="toggleAdjacents" :class="['floating-adjacents-btn', { active: showAdjacents }]" :title="showAdjacents ? 'Ocultar Conexiones' : 'Mostrar Conexiones'">
-              <RunFast />
-            </button>
-            <button @click="toggleAngleMode" :class="['floating-mode-btn', { active: angleMode === '3d' }]" :title="angleMode === '3d' ? 'Cambiar a 2D Proyectado' : 'Cambiar a 3D Biomecánico'">
-              <Cube />
-            </button>
-
-            <!-- Indicador de modo de cálculo de ángulos -->
-            <div class="video-mode-indicator">
-              <span>{{ angleMode === '3d' ? '3D Biomecánico (Sensores)' : '2D Proyectado (Pantallazo)' }}</span>
-            </div>
-          </div>
+          
+          <ExerciseVideoPlayer
+            v-if="exercise.video"
+            :videoSrc="exercise.video"
+            :trackedPoints="tracked_points"
+            v-model:angleMode="angleMode"
+            @metadata-loaded="calculateInitialProgress"
+          />
           
           <div style="width: 100%; height: 8px; background: #333; border-radius: 4px; margin-top: 15px; overflow: hidden; border: 1px solid #555;">
             <div :style="'height: 100%; background: #4BC0C0; transition: width 0.2s ease-out; width: ' + analysisProgress + '%;'"></div>
           </div>
           <p class="light-font dark-text" style="text-align: right; font-size: 0.85em; margin-top: 5px; margin-bottom: 0;">Progreso del análisis: {{ analysisProgress }}%</p>
 
-          <!-- ─── Panel de control de análisis ─────────────────────────────── -->
-          <div class="analysis-panel">
-            <div class="analysis-status-bar">
-              <span :class="['analysis-badge', analysisState]">
-                <span v-if="analysisState === 'running'">● Analizando en segundo plano...</span>
-                <span v-else-if="analysisState === 'initializing'">⟳ Cargando motor de análisis...</span>
-                <span v-else-if="analysisState === 'paused'">⏸ Análisis pausado</span>
-                <span v-else-if="analysisState === 'complete'">✓ Análisis completado ({{ analysisProgress }}%)</span>
-                <span v-else>○ Sin análisis activo</span>
-              </span>
-            </div>
-            <div class="analysis-actions">
-              <button
-                class="btn analysis-btn btn-start"
-                :disabled="['running', 'initializing', 'complete'].includes(analysisState)"
-                @click="startAnalysis"
-              >
-                <PlayCircle class="action-icon" />
-                <span>{{ analysisState === 'paused' ? 'Reanudar análisis' : 'Iniciar análisis' }}</span>
-              </button>
-              <button
-                class="btn analysis-btn btn-pause"
-                :disabled="analysisState !== 'running'"
-                @click="pauseAnalysis"
-              >
-                <PauseCircle class="action-icon" />
-                <span>Pausar análisis</span>
-              </button>
-              <button
-                class="btn analysis-btn btn-discard"
-                :disabled="analysisState === 'idle' && !hasResultsFlag"
-                @click="discardAnalysis"
-              >
-                <DeleteForever class="action-icon" />
-                <span>Descartar análisis</span>
-              </button>
-            </div>
-          </div>
+          <ExerciseAnalysisPanel
+            :analysisState="analysisState"
+            :isEngineReady="isEngineReady"
+            :analysisProgress="analysisProgress"
+            :targetFps="targetFps"
+            :nativeVideoFps="nativeVideoFps"
+            :hasResultsFlag="hasResultsFlag"
+            @update:targetFps="targetFps = $event"
+            @start="startAnalysis"
+            @pause="pauseAnalysis"
+            @discard="discardAnalysis"
+          />
 
           <hr>
           <div class="patients-table">
@@ -124,31 +68,13 @@
             </template>
           </div> 
           
-          <div v-show="showCharts" style="width: 100%; margin-top: 30px;">
-            <hr>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-              <h3 class="regular-font dark-text" style="margin: 0;">Análisis de Movimiento en el Tiempo:</h3>
-              <select v-model="chartType" @change="generateCharts" class="form-control" style="width: 250px; font-size: 1.1em; padding: 8px;">
-                <option value="posicion">Posición vs Tiempo (X, Y, Z)</option>
-                <option value="angulo">Ángulos vs Tiempo (Grados)</option>
-              </select>
-            </div>
-            
-            <div v-for="point in tracked_points" :key="point.codename" style="margin-bottom: 60px; width: 100%;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
-                <h4 class="light-font" style="margin: 0;">{{ point.verbose }}</h4>
-                <div v-if="chartStats[point.codename]" style="display: flex; gap: 10px; font-size: 0.85em; flex-wrap: wrap;">
-                  <div v-for="stat in chartStats[point.codename]" :key="stat.label" 
-                       :style="`background-color: ${stat.color}15; color: ${stat.color}; border: 1px solid ${stat.color}50; padding: 6px 14px; border-radius: 20px; font-weight: 500; font-family: 'Open Sans', sans-serif;`">
-                    <strong>{{ stat.label }}</strong> &bull; Mín: {{ stat.min }} &bull; Máx: {{ stat.max }} &bull; Prom: {{ stat.avg }}
-                  </div>
-                </div>
-              </div>
-              <div style="height: 350px; width: 100%; margin-top: 10px;">
-                <canvas :id="'chart-' + point.codename" style="width: 100%; height: 100%;"></canvas>
-              </div>
-            </div>
-          </div>
+          <ExerciseCharts
+            v-show="showCharts"
+            :trackedPoints="tracked_points"
+            :chartStats="chartStats"
+            v-model:chartType="chartType"
+            @refresh="generateCharts"
+          />
         </template>
       </div>
     </div>
@@ -162,7 +88,7 @@
           <RunFast class="action-icon" />
           <span>Asignar nueva dificultad al ejercicio</span>
         </button>
-        <button class="btn btn-dark" v-on:click="sendResults" :disabled="!hasResults">
+        <button class="btn btn-dark" v-on:click="sendResults" :disabled="!hasResultsFlag">
           <Upload class="action-icon" />
           <span>Enviar resultados</span>
         </button>
@@ -193,31 +119,51 @@
 
 <script>
 import '@/styles/views/view_routine.scss';
-import { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel, PlayCircle, PauseCircle, DeleteForever, Human } from 'mdue';
+import { VideoAccount, RunFast, Upload, Download, ChartLine, Cube, FileExcel } from 'mdue';
 import { Chart, registerables } from 'chart.js';
-import PoseLandmarkerService   from '@/services/poseLandmarkerService';
 import ExerciseApiService      from '@/services/exerciseApiService';
 import MovementHistoryService  from '@/services/movementHistoryService';
 import ExerciseExportService   from '@/services/exerciseExportService';
 import ExerciseChartService       from '@/services/exerciseChartService';
 import BackgroundAnalysisService  from '@/services/backgroundAnalysisService';
+
+import ExerciseVideoPlayer from '@/components/exercises/ExerciseVideoPlayer.vue';
+import ExerciseAnalysisPanel from '@/components/exercises/ExerciseAnalysisPanel.vue';
+import ExerciseCharts from '@/components/exercises/ExerciseCharts.vue';
+
 Chart.register(...registerables);
 
 export default {
   name: 'ViewExercise',
-
-  components: { VideoAccount, RunFast, Upload, Download, Fullscreen, ChartLine, Cube, FileExcel, PlayCircle, PauseCircle, DeleteForever, Human },
-
+  components: { 
+    VideoAccount, RunFast, Upload, Download, ChartLine, Cube, FileExcel,
+    ExerciseVideoPlayer, ExerciseAnalysisPanel, ExerciseCharts
+  },
+  data() {
+    return {
+      exercise: {},
+      tracked_points: [],
+      difficulties: [],
+      hasResultsFlag: false,
+      showCharts: false,
+      chartStats: {},
+      analysisProgress: 0,
+      chartType: 'posicion',
+      analysisState: 'idle',
+      angleMode: '3d',
+      targetFps: 30,
+      isEngineReady: false,
+      nativeVideoFps: 30,
+      videoDuration: 0, // Keep track of duration received from player
+    };
+  },
   async beforeMount() {
     this._apiService     = new ExerciseApiService();
-    this._poseService    = new PoseLandmarkerService();
     this._chartService   = new ExerciseChartService();
-    this._poseService.setAngleMode(this.angleMode);
 
-    // Intentar inicializar de inmediato si el ID está disponible en los parámetros de la ruta
     const routeId = this.$route.params.exercise_id;
     if (routeId) {
-      this._initializeAnalysisState(routeId);
+      await this._initializeAnalysisState(routeId);
     }
 
     try {
@@ -225,45 +171,46 @@ export default {
     } catch (e) {
       console.error('Error cargando ejercicio:', e);
     }
-
-    // Inicializar detector de esqueleto de primer plano
-    await this._poseService.initialize();
   },
-
-  beforeUnmount() {
-    // Detener el loop de visualización del video principal
-    this._detectionActive = false;
-    // Liberar instancia principal de MediaPipe (GPU)
-    this._poseService?.destroy();
-    // Liberar gráficas (Chart.js instances)
+  mounted() {
+    window.addEventListener('beforeunload', this._onBeforeUnload);
+  },
+  async beforeUnmount() {
+    window.removeEventListener('beforeunload', this._onBeforeUnload);
+    await this._historyService?.saveToStorage();
     this._chartService.destroyAll();
-    // Detener callbacks del análisis en segundo plano para evitar fugas de memoria o errores
     this._backgroundService?.detachCallbacks();
   },
-
-  computed: {
-    hasResults() {
-      return this.hasResultsFlag;
+  watch: {
+    async targetFps(newVal) {
+      if (this._historyService) {
+        this._historyService.targetFps = newVal;
+        await this._historyService.saveToStorage();
+      }
     },
+    angleMode(newVal) {
+      if (this._backgroundService) {
+        this._backgroundService.setAngleMode(newVal);
+      }
+    }
   },
-
   methods: {
-    // ─── Inicialización de estado y servicios ──────────────────────────────────
+    async _onBeforeUnload() {
+      await this._historyService?.saveToStorage();
+    },
 
-    _initializeAnalysisState(exerciseId) {
+    async _initializeAnalysisState(exerciseId) {
       if (!exerciseId) return;
-
-      // Si ya está inicializado para el mismo ID, no hacer duplicación
       if (this._historyService && String(this._historyService.exerciseId) === String(exerciseId)) {
         return;
       }
 
       this._historyService = new MovementHistoryService(exerciseId);
-      this._loadHistory();
+      await this._loadHistory();
 
-      // Conectar con el análisis en segundo plano si ya está corriendo para este ejercicio
       this._backgroundService = BackgroundAnalysisService;
       this._backgroundService.setAngleMode(this.angleMode);
+      this.isEngineReady = this._backgroundService.isReady();
       if (this._backgroundService.isRunningFor(exerciseId)) {
         this._backgroundService.attachCallbacks({
           onFrame:    (t, angles, coords) => this._onBackgroundFrame(t, angles, coords),
@@ -271,14 +218,18 @@ export default {
             const p = this._historyService.calculateProgress(duration);
             if (this.analysisProgress !== p) this.analysisProgress = p;
           },
-          onComplete: () => {
+          onComplete: async () => {
             this._historyService.isComplete = true;
-            this._historyService.saveToStorage();
+            await this._historyService.saveToStorage();
             this.analysisProgress = 100;
             this.analysisState = 'complete';
             this.hasResultsFlag = this._historyService.hasFrames();
+            this.isEngineReady = false;
           },
-          onError: () => { this.analysisState = 'idle'; },
+          onError: () => {
+            this.analysisState = 'idle';
+            this.isEngineReady = false;
+          },
         });
         this.analysisState = this._backgroundService.getState();
 
@@ -301,24 +252,104 @@ export default {
       }
     },
 
-    // ─── Carga de datos ──────────────────────────────────────────────────────
-
     async _loadExercise() {
       const response = await this._apiService.getExercise(this.$route.params.exercise_id);
       if (response.status !== 404) {
         this.exercise = response.data;
-        
-        // Asegurar la inicialización correcta del estado con el ID real de la base de datos (por si hubo demora en la ruta)
         if (this.exercise.id) {
-          this._initializeAnalysisState(this.exercise.id);
+          await this._initializeAnalysisState(this.exercise.id);
         }
-
         const ready = this.exercise.status === 'Video procesado' || this.exercise.status === 'Video en procesamiento';
         if (ready) {
           await this._loadTrackedPoints();
           await this._loadDifficulties();
+          if (this.exercise.video) {
+            this.detectVideoFpsSilently(this.exercise.video).then(detectedFps => {
+              this.nativeVideoFps = detectedFps;
+              if (this.targetFps > detectedFps) {
+                this.targetFps = detectedFps;
+              }
+            });
+          }
         }
       }
+    },
+
+    detectVideoFpsSilently(videoSrc) {
+      return new Promise((resolve) => {
+        const tempVideo = document.createElement('video');
+        tempVideo.src = videoSrc;
+        tempVideo.muted = true;
+        tempVideo.playsInline = true;
+        tempVideo.style.cssText = 'position:fixed;left:0;top:0;width:4px;height:4px;pointer-events:none;opacity:0.01;z-index:-9999';
+        document.body.appendChild(tempVideo);
+        
+        let samples = 0;
+        let minDelta = 0.05;
+        let lastTime = undefined;
+        let resolved = false;
+
+        const cleanup = () => {
+          tempVideo.pause();
+          tempVideo.src = '';
+          tempVideo.load();
+          if (document.body.contains(tempVideo)) {
+            document.body.removeChild(tempVideo);
+          }
+        };
+
+        const cb = (now, metadata) => {
+          if (resolved) return;
+          const currentTime = tempVideo.currentTime;
+          const mediaTime = (metadata && typeof metadata.mediaTime === 'number') ? metadata.mediaTime : currentTime;
+          
+          if (lastTime !== undefined) {
+            const delta = mediaTime - lastTime;
+            if (delta > 0.008 && delta < 0.12) {
+              minDelta = Math.min(minDelta, delta);
+              samples++;
+              if (samples >= 15) {
+                resolved = true;
+                cleanup();
+                const rawFps = 1 / minDelta;
+                let finalFps = 30;
+                if (rawFps >= 55) finalFps = 60;
+                else if (rawFps >= 45) finalFps = 50;
+                else if (rawFps >= 27) finalFps = 30;
+                else if (rawFps >= 23) finalFps = 25;
+                else finalFps = 24;
+                resolve(finalFps);
+                return;
+              }
+            }
+          }
+          lastTime = mediaTime;
+          if (tempVideo.requestVideoFrameCallback) {
+            tempVideo.requestVideoFrameCallback(cb);
+          } else {
+            setTimeout(() => cb(null, null), 16);
+          }
+        };
+
+        tempVideo.addEventListener('loadeddata', () => {
+          if (tempVideo.requestVideoFrameCallback) {
+            tempVideo.requestVideoFrameCallback(cb);
+          } else {
+            setTimeout(() => cb(null, null), 16);
+          }
+          tempVideo.play().catch(() => { cleanup(); resolve(30); });
+        });
+
+        tempVideo.addEventListener('error', () => { cleanup(); resolve(30); });
+        
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            cleanup();
+            resolve(30);
+          }
+        }, 3000);
+      });
     },
 
     async _loadTrackedPoints() {
@@ -337,51 +368,31 @@ export default {
       if (response.status === 200) this.difficulties = response.data;
     },
 
-    _loadHistory() {
-      const loaded = this._historyService.loadFromStorage();
+    async _loadHistory() {
+      const loaded = await this._historyService.loadFromStorage();
       if (loaded) {
         this.hasResultsFlag = this._historyService.hasFrames();
-        this.calculateInitialProgress();
+        if (this._historyService.targetFps !== undefined) {
+          this.targetFps = this._historyService.targetFps;
+        }
+        await this.calculateInitialProgress();
       }
     },
 
-    // ─── Controles de video ──────────────────────────────────────────────────
-
-    togglePlayPause() {
-      const video = this.$refs.video;
-      if (!video) return;
-      video.paused ? video.play() : video.pause();
-    },
-
-    toggleFullScreen() {
-      const elem = this.$refs.videoContainer;
-      if (!elem) return;
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen().catch(err => console.error('Error pantalla completa:', err));
-      } else {
-        document.exitFullscreen();
-      }
-    },
-
-    calculateInitialProgress() {
-      const video = this.$refs.video;
-      // Guardar el duration en el historial si está disponible en el elemento video
-      if (video && video.duration && !isNaN(video.duration) && video.duration > 0) {
+    async calculateInitialProgress(duration) {
+      if (duration && !isNaN(duration) && duration > 0) {
+        this.videoDuration = duration;
         const oldDuration = this._historyService.videoDuration;
-        this._historyService.videoDuration = video.duration;
-        // Guardar en storage si es la primera vez o si la duración cambió
-        if (oldDuration !== video.duration) {
-          this._historyService.saveToStorage();
+        this._historyService.videoDuration = duration;
+        if (oldDuration !== duration) {
+          await this._historyService.saveToStorage();
         }
       }
 
-      const duration = (video && video.duration && !isNaN(video.duration) && video.duration > 0)
-        ? video.duration
-        : this._historyService.videoDuration;
+      const dur = this.videoDuration || this._historyService.videoDuration;
 
-      if (duration) {
-        this.analysisProgress = this._historyService.calculateProgress(duration);
-        // Ajustar el estado del análisis basado en el progreso si no está corriendo/inicializando
+      if (dur) {
+        this.analysisProgress = this._historyService.calculateProgress(dur);
         if (!['running', 'initializing'].includes(this.analysisState)) {
           if (this.hasResultsFlag) {
             this.analysisState = this.analysisProgress === 100 ? 'complete' : 'paused';
@@ -392,214 +403,70 @@ export default {
       }
     },
 
-    // ─── Loop de detección de pose ───────────────────────────────────────────
-
-    startDetection() {
-      if (!this.showSkeleton) return;
-      const video  = this.$refs.video;
-      const canvas = this.$refs.canvas;
-      if (!video || !canvas) return;
-      // Evitar loops duplicados si el usuario pausa y reanuda rápidamente
-      if (this._detectionActive) return;
-
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      this._poseService.createDrawingUtils(canvas.getContext('2d'));
-      this._detectionActive = true;
-
-      const processFrame = async (now, metadata) => {
-        // Se comprueba el flag antes Y después de cada await para cortar el loop
-        // inmediatamente si el componente fue destruido durante la detección.
-        if (!this._detectionActive || !video || video.paused || video.ended) {
-          this._detectionActive = false;
-          return;
-        }
-        try {
-          const timestamp = performance.now();
-          // null: solo visualización del esqueleto; los datos los recoge el análisis en segundo plano
-          await this._poseService.detectForVideo(
-            video, canvas, timestamp, this.tracked_points, null, this.showAdjacents
-          );
-        } catch (e) {
-          console.error('Error en renderLoop:', e);
-        }
-        // Segunda comprobación post-await: el componente pudo haberse desmontado
-        // durante la operación async de MediaPipe.
-        if (!this._detectionActive) return;
-        if (video.requestVideoFrameCallback) {
-          video.requestVideoFrameCallback(processFrame);
-        } else {
-          requestAnimationFrame(processFrame);
-        }
-      };
-
-      if (video.requestVideoFrameCallback) {
-        video.requestVideoFrameCallback(processFrame);
-      } else {
-        requestAnimationFrame(processFrame);
-      }
-    },
-
-    stopDetection() {
-      // Poner el flag a false detiene el loop en la próxima iteración
-      this._detectionActive = false;
-    },
-
-    detectSingleFrame() {
-      if (!this.showSkeleton) return;
-      const video = this.$refs.video;
-      if (!video) return;
-      if (video.paused) {
-        this._runSingleFrameDetection();
-      } else {
-        // Si se buscó mientras se reproducía, asegurar que el loop de renderizado esté activo
-        this.startDetection();
-      }
-    },
-
-    async _runSingleFrameDetection() {
-      const video  = this.$refs.video;
-      const canvas = this.$refs.canvas;
-      if (!video || !canvas || !this._poseService) return;
-      try {
-        canvas.width  = video.videoWidth;
-        canvas.height = video.videoHeight;
-        this._poseService.createDrawingUtils(canvas.getContext('2d'));
-        await this._poseService.detectForVideo(
-          video, canvas, performance.now(), this.tracked_points, null, this.showAdjacents
-        );
-      } catch (e) {
-        console.error('Error en _runSingleFrameDetection:', e);
-      }
-    },
-
-    toggleSkeleton() {
-      this.showSkeleton = !this.showSkeleton;
-      const canvas = this.$refs.canvas;
-      const video  = this.$refs.video;
-
-      if (!this.showSkeleton) {
-        this.stopDetection();
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
-      } else {
-        if (video) {
-          if (!video.paused && !video.ended) {
-            this.startDetection();
-          } else {
-            this.detectSingleFrame();
-          }
-        }
-      }
-    },
-
-    toggleAdjacents() {
-      this.showAdjacents = !this.showAdjacents;
-      if (this.showAdjacents && !this.showSkeleton) {
-        this.showSkeleton = true;
-      }
-      const video = this.$refs.video;
-      if (video) {
-        if (!video.paused && !video.ended) {
-          if (!this._detectionActive) {
-            this.startDetection();
-          }
-        } else {
-          this.detectSingleFrame();
-        }
-      }
-    },
-
-    toggleAngleMode() {
-      this.angleMode = this.angleMode === '3d' ? '2d' : '3d';
-      this._poseService.setAngleMode(this.angleMode);
-      BackgroundAnalysisService.setAngleMode(this.angleMode);
-      const video = this.$refs.video;
-      if (video) {
-        if (!video.paused && !video.ended) {
-          if (!this._detectionActive) {
-            this.startDetection();
-          }
-        } else {
-          this.detectSingleFrame();
-        }
-      }
-    },
-
-    // ─── Control de análisis (segundo plano) ─────────────────────────────────
-
-    /**
-     * Inicia o reanuda el análisis en segundo plano.
-     * La primera vez inicializa BackgroundAnalysisService (carga MediaPipe).
-     * Las veces siguientes reutiliza la instancia ya cargada.
-     */
     async startAnalysis() {
-      // Solo usar resume() si la instancia del servicio en segundo plano realmente
-      // tiene el video cargado para este ejercicio y está pausada.
       if (
         this.analysisState === 'paused' &&
         this._backgroundService.getExerciseId() === this.exercise.id &&
-        this._backgroundService.getState() === 'paused'
+        this._backgroundService.getState() === 'paused' &&
+        this._backgroundService.isReady()
       ) {
         this.analysisState = 'running';
         this._backgroundService.resume();
+        this.isEngineReady = true;
         return;
       }
 
-      // Inicialización lazy: solo la primera vez o tras refresco
       this.analysisState = 'initializing';
+      this.isEngineReady = false;
       try {
         await this._backgroundService.initialize(this.exercise.id);
+        this.isEngineReady = true;
       } catch (e) {
         console.error('Error inicializando análisis en segundo plano:', e);
         this.analysisState = this.hasResultsFlag ? 'paused' : 'idle';
+        this.isEngineReady = false;
         alert('No se pudo inicializar el motor de análisis. Intenta de nuevo.');
         return;
       }
 
       if (!this.exercise?.video) {
-        console.error('No hay URL de video disponible para analizar.');
         this.analysisState = 'idle';
         return;
       }
 
       this.analysisState = 'running';
-
-      // Si ya hay frames guardados (p.ej. tras un F5), reanudar desde el último
-      // punto analizado en lugar de volver a empezar desde 0.
       const resumeTime = this._historyService.getLastAnalyzedTime();
 
-      this._backgroundService.start(
+      await this._backgroundService.start(
         this.exercise.video,
         this.tracked_points,
         this.exercise.id,
         {
           startTime:  resumeTime,
+          targetFps:  this.targetFps,
+          videoFps:   this.nativeVideoFps,
           onFrame:    (t, angles, coords) => this._onBackgroundFrame(t, angles, coords),
           onProgress: (currentTime, duration) => {
             const p = this._historyService.calculateProgress(duration);
             if (this.analysisProgress !== p) this.analysisProgress = p;
           },
-          onComplete: () => {
+          onComplete: async () => {
             this._historyService.isComplete = true;
-            this._historyService.saveToStorage();
+            await this._historyService.saveToStorage();
             this.analysisProgress = 100;
             this.analysisState = 'complete';
             this.hasResultsFlag = this._historyService.hasFrames();
+            this.isEngineReady = false;
           },
-          onError: () => { this.analysisState = 'idle'; },
+          onError: () => {
+            this.analysisState = 'idle';
+            this.isEngineReady = false;
+          },
         }
       );
     },
 
-    /**
-     * Callback invocado por BackgroundAnalysisService en cada frame analizado.
-     * Actualiza el historial, los resultados observados y las gráficas en vivo.
-     */
     _onBackgroundFrame(currentTime, angles, coords) {
-      // Actualizar min/max observados (tabla de ángulos)
       for (const codename in angles) {
         if (this._observedResults?.[codename]) {
           const v = angles[codename];
@@ -608,18 +475,15 @@ export default {
         }
       }
 
-      // Registrar frame en historial
       this._historyService.addFrame(currentTime, angles, coords, null);
       this.hasResultsFlag = this._historyService.hasFrames();
 
-      // Persistir periódicamente
       const now = Date.now();
       if (now - (this._lastSaveTime || 0) > 3000) {
         this._historyService.saveToStorage();
         this._lastSaveTime = now;
       }
 
-      // Refrescar gráficas en vivo si están visibles
       if (this.showCharts && now - (this._lastChartUpdate || 0) > 500) {
         const stats = this._chartService.refreshCharts(
           this.tracked_points, this._historyService.getHistoryArray(), this.chartType
@@ -629,18 +493,17 @@ export default {
       }
     },
 
-    pauseAnalysis() {
+    async pauseAnalysis() {
       this.analysisState = 'paused';
-      this._backgroundService?.pause();
-      this._historyService.saveToStorage();
+      await this._backgroundService?.pause();
+      await this._historyService.saveToStorage();
       this.hasResultsFlag = this._historyService.hasFrames();
     },
 
-    discardAnalysis() {
+    async discardAnalysis() {
       if (!confirm('¿Seguro que quieres descartar el análisis? Se borrarán todos los frames recolectados.')) return;
-      // Detiene el video oculto pero conserva la instancia de MediaPipe
       this._backgroundService?.discard();
-      this._historyService.reset();
+      await this._historyService.reset();
       this._observedResults && this.tracked_points.forEach(p => {
         this._observedResults[p.codename] = { min: Infinity, max: -Infinity };
       });
@@ -650,9 +513,8 @@ export default {
       this.showCharts = false;
       this.chartStats = {};
       this._chartService.destroyAll();
+      this.isEngineReady = false;
     },
-
-    // ─── Gráficas ────────────────────────────────────────────────────────────
 
     generateCharts() {
       this.showCharts = true;
@@ -663,27 +525,23 @@ export default {
       });
     },
 
-    // ─── Exportaciones ───────────────────────────────────────────────────────
-
     exportToCSV() {
       ExerciseExportService.exportTrackedCSV(
-        this._historyService.getHistoryArray(), this.tracked_points, this.exercise.name
+        this._historyService.getHistoryArray(), this.tracked_points, this.exercise.name, this.targetFps
       );
     },
 
     exportRawCSV() {
       ExerciseExportService.exportRawCSV(
-        this._historyService.getHistoryArray(), this.exercise.name
+        this._historyService.getHistoryArray(), this.exercise.name, this.targetFps
       );
     },
 
     downloadMovementJSON() {
       ExerciseExportService.exportMovementJSON(
-        this.exercise, this.$refs.video?.duration, this._historyService.getHistoryArray()
+        this.exercise, this.videoDuration, this._historyService.getHistoryArray(), this.targetFps
       );
     },
-
-    // ─── Envío de resultados ─────────────────────────────────────────────────
 
     async sendResults() {
       if (!this._observedResults) return;
@@ -696,25 +554,7 @@ export default {
         console.error('Error enviando resultados:', error);
       }
     },
-  },
-
-  data() {
-    return {
-      exercise: {},
-      tracked_points: [],
-      difficulties: [],
-      hasResultsFlag: false,
-      showCharts: false,
-      chartStats: {},
-      analysisProgress: 0,
-      chartType: 'posicion',
-      /** 'idle' | 'running' | 'paused' */
-      analysisState: 'idle',
-      showSkeleton: true,
-      showAdjacents: false,
-      angleMode: '3d',
-    };
-  },
+  }
 };
 </script>
 
@@ -755,225 +595,4 @@ export default {
   }
 }
 .action-icon { font-size: 1.4em; }
-
-.analysis-panel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 12px 16px;
-  background: #1a1a1a;
-  border: 1px solid #333;
-  border-radius: 10px;
-}
-
-.analysis-status-bar {
-  display: flex;
-  align-items: center;
-}
-
-.analysis-badge {
-  font-size: 0.85em;
-  font-weight: 600;
-  padding: 5px 14px;
-  border-radius: 20px;
-  letter-spacing: 0.03em;
-  transition: all 0.3s ease;
-
-  &.idle         { background: #2a2a2a; color: #888;    border: 1px solid #444;    }
-  &.running      { background: #0d3320; color: #4ade80; border: 1px solid #22c55e; animation: pulse-green 1.8s infinite; }
-  &.initializing { background: #0d2233; color: #60a5fa; border: 1px solid #3b82f6; animation: pulse-blue 1.2s infinite; }
-  &.paused       { background: #2d2200; color: #fbbf24; border: 1px solid #f59e0b; }
-  &.complete     { background: #0a2518; color: #86efac; border: 1px solid #4ade80; }
-}
-
-@keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
-}
-
-@keyframes pulse-blue {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
-  50%       { box-shadow: 0 0 0 6px rgba(96, 165, 250, 0); }
-}
-
-.analysis-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.analysis-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1em !important;
-  padding: 9px 20px !important;
-  border-radius: 8px !important;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
-
-  &:disabled { opacity: 0.38; cursor: not-allowed; }
-  &:not(:disabled):hover { transform: translateY(-1px); }
-
-  &.btn-start   { background: #166534; color: #bbf7d0; }
-  &.btn-pause   { background: #78350f; color: #fde68a; }
-  &.btn-discard { background: #7f1d1d; color: #fecaca; }
-}
-
-.floating-fullscreen-btn {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
-  background-color: rgba(0, 0, 0, 0.4);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.8);
-    transform: scale(1.05);
-  }
-
-  svg {
-    font-size: 30px;
-  }
-}
-
-.floating-skeleton-btn {
-  position: absolute;
-  top: 70px;
-  right: 20px;
-  z-index: 10;
-  background-color: rgba(0, 0, 0, 0.4);
-  color: rgba(255, 255, 255, 0.5);
-  border: none;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &.active {
-    background-color: rgba(75, 192, 192, 0.8);
-    color: white;
-    
-    &:hover {
-      background-color: rgba(75, 192, 192, 1);
-    }
-  }
-
-  &:not(.active):hover {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    transform: scale(1.05);
-  }
-
-  svg {
-    font-size: 30px;
-  }
-}
-
-.floating-adjacents-btn {
-  position: absolute;
-  top: 120px;
-  right: 20px;
-  z-index: 10;
-  background-color: rgba(0, 0, 0, 0.4);
-  color: rgba(255, 255, 255, 0.5);
-  border: none;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &.active {
-    background-color: rgba(59, 130, 246, 0.8);
-    color: white;
-    
-    &:hover {
-      background-color: rgba(59, 130, 246, 1);
-    }
-  }
-
-  &:not(.active):hover {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    transform: scale(1.05);
-  }
-
-  svg {
-    font-size: 30px;
-  }
-}
-
-.floating-mode-btn {
-  position: absolute;
-  top: 170px;
-  right: 20px;
-  z-index: 10;
-  background-color: rgba(0, 0, 0, 0.4);
-  color: rgba(255, 255, 255, 0.5);
-  border: none;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  &.active {
-    background-color: rgba(16, 185, 129, 0.8); /* Verde como el punto central */
-    color: white;
-    
-    &:hover {
-      background-color: rgba(16, 185, 129, 1);
-    }
-  }
-
-  &:not(.active):hover {
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    transform: scale(1.05);
-  }
-
-  svg {
-    font-size: 30px;
-  }
-}
-
-.video-mode-indicator {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  z-index: 10;
-  background-color: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(4px);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  pointer-events: none;
-  font-family: 'Outfit', sans-serif;
-  letter-spacing: 0.02em;
-}
 </style>

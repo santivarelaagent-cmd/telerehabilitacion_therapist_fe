@@ -280,16 +280,35 @@ export default {
     formatPointName,
     landmarkName
   },
-  mounted() {
-    // Optional: auto-load from localStorage if exercise_id is in route
+  async mounted() {
+    // Optional: auto-load from IndexedDB/localStorage if exercise_id is in route
     const exerciseId = this.$route.params.exercise_id;
     if (exerciseId) {
-      const cached = localStorage.getItem(`exercise_${exerciseId}_history`);
-      if (cached) {
+      const key = `exercise_${exerciseId}_history`;
+      let cachedData = null;
+      try {
+        const { getHistory } = await import('../../../services/dbService');
+        cachedData = await getHistory(key);
+      } catch (err) {
+        console.warn('Error reading from IndexedDB in 3d_viewer:', err);
+      }
+
+      if (!cachedData) {
+        // Fallback to localStorage
+        const localCached = localStorage.getItem(key);
+        if (localCached) {
+          try {
+            cachedData = JSON.parse(localCached);
+          } catch (e) {
+            console.error('Error parsing localStorage in 3d_viewer:', e);
+          }
+        }
+      }
+
+      if (cachedData) {
         try {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.map) {
-             const historyArr = Object.values(parsed.map).sort((a, b) => a.t - b.t);
+          if (cachedData.map) {
+             const historyArr = Object.values(cachedData.map).sort((a, b) => a.t - b.t);
              this.loadJsonData({
                 exercise_name: "Cargado desde Memoria Local",
                 frames: historyArr

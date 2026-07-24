@@ -35,6 +35,31 @@ export default class ExerciseExportService {
     URL.revokeObjectURL(url);
   }
 
+  // ─── Downsampling helper ───────────────────────────────────────────────────
+
+  /**
+   * Submuestrea el historial a una tasa de FPS objetivo.
+   * @param {Array} historyArr
+   * @param {number} targetFps - 0 o undefined para conservar todos
+   * @returns {Array}
+   */
+  static downsampleHistory(historyArr, targetFps) {
+    if (!targetFps || targetFps <= 0 || !historyArr || historyArr.length === 0) {
+      return historyArr;
+    }
+    const interval = 1 / targetFps;
+    const result = [];
+    let nextTargetTime = historyArr[0].t;
+    for (const frame of historyArr) {
+      // Usar margen de tolerancia de 1ms para imprecisión de floats
+      if (frame.t >= nextTargetTime - 0.001) {
+        result.push(frame);
+        nextTargetTime = frame.t + interval;
+      }
+    }
+    return result;
+  }
+
   // ─── Exportaciones públicas ────────────────────────────────────────────────
 
   /**
@@ -42,9 +67,11 @@ export default class ExerciseExportService {
    * @param {Array} historyArr - frames ordenados
    * @param {Array} trackedPoints - puntos configurados en el ejercicio
    * @param {string} exerciseName
+   * @param {number} targetFps - FPS de muestreo deseado
    */
-  static exportTrackedCSV(historyArr, trackedPoints, exerciseName) {
-    if (!historyArr || historyArr.length === 0) return;
+  static exportTrackedCSV(historyArr, trackedPoints, exerciseName, targetFps = 0) {
+    const sampled = this.downsampleHistory(historyArr, targetFps);
+    if (!sampled || sampled.length === 0) return;
 
     const headers = ['Tiempo (s)'];
     for (const point of trackedPoints) {
@@ -53,7 +80,7 @@ export default class ExerciseExportService {
     }
 
     const rows = [headers.join(',')];
-    for (const frame of historyArr) {
+    for (const frame of sampled) {
       const row = [frame.t.toFixed(3)];
       for (const point of trackedPoints) {
         const coords = frame.points[point.id];
@@ -81,9 +108,11 @@ export default class ExerciseExportService {
    * CSV crudo con los 33 landmarks de MediaPipe: tiempo + (X, Y, Z, visibility) × 33.
    * @param {Array} historyArr - frames ordenados
    * @param {string} exerciseName
+   * @param {number} targetFps - FPS de muestreo deseado
    */
-  static exportRawCSV(historyArr, exerciseName) {
-    if (!historyArr || historyArr.length === 0) return;
+  static exportRawCSV(historyArr, exerciseName, targetFps = 0) {
+    const sampled = this.downsampleHistory(historyArr, targetFps);
+    if (!sampled || sampled.length === 0) return;
 
     const headers = ['tiempo_s'];
     for (const name of this.LANDMARK_NAMES) {
@@ -91,7 +120,7 @@ export default class ExerciseExportService {
     }
 
     const rows = [headers.join(',')];
-    for (const frame of historyArr) {
+    for (const frame of sampled) {
       const row = [frame.t.toFixed(4)];
       for (let i = 0; i < 33; i++) {
         const pt = frame.points[i];
@@ -116,13 +145,15 @@ export default class ExerciseExportService {
    * @param {object} exercise - { id, name }
    * @param {number} duration - duración del video en segundos
    * @param {Array}  historyArr - frames ordenados
+   * @param {number} targetFps - FPS de muestreo deseado
    */
-  static exportMovementJSON(exercise, duration, historyArr) {
+  static exportMovementJSON(exercise, duration, historyArr, targetFps = 0) {
+    const sampled = this.downsampleHistory(historyArr, targetFps);
     const data = {
       exercise_id: exercise.id,
       exercise_name: exercise.name,
       duration,
-      frames: historyArr,
+      frames: sampled,
     };
     this._triggerDownload(
       JSON.stringify(data),

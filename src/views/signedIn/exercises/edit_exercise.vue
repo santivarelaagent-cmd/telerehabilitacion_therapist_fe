@@ -84,6 +84,20 @@
         </div>
         <div class="form-group"><hr /></div>
         <div>
+          <!-- Indicador de estado del video actual -->
+          <div class="form-group">
+            <label class="light-font dark-text">Estado del video actual</label>
+            <div :class="['video-status-indicator', exercise.video ? 'has-video' : 'no-video']">
+              <span v-if="exercise.video" class="video-status-icon">✅</span>
+              <span v-else class="video-status-icon">❌</span>
+              <span class="video-status-text">
+                {{ exercise.video ? 'Video cargado correctamente' : 'Sin video asociado' }}
+              </span>
+            </div>
+            <a v-if="exercise.video" :href="exercise.video" target="_blank" rel="noopener" class="video-preview-link">
+              🔗 Ver video actual
+            </a>
+          </div>
           <div class="form-group">
             <label for="video" class="light-font dark-text"
               >Subir un nuevo video</label
@@ -95,6 +109,19 @@
               accept="video/*"
               @change="videoChanged"
             />
+            <!-- Barra de progreso de subida -->
+            <div v-if="uploadStatus === 'uploading'" class="upload-status-msg uploading">
+              ⏳ Subiendo video a Firebase... {{ uploadProgress }}%
+            </div>
+            <div v-if="uploadStatus === 'uploading'" class="upload-progress-container">
+              <div class="upload-progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+            </div>
+            <div v-if="uploadStatus === 'success'" class="upload-status-msg success">
+              ✅ Video subido exitosamente a Firebase
+            </div>
+            <div v-if="uploadStatus === 'error'" class="upload-status-msg error">
+              ❌ Error al subir el video
+            </div>
           </div>
           <div class="form-group">
             <label class="light-font dark-text"
@@ -125,9 +152,11 @@
             </div>
           </div>
         </div>
-        <button type="submit" class="btn btn-success btn-lg" style="margin-top: 24px;">
+        <button type="submit" class="btn btn-success btn-lg" style="margin-top: 24px;" :disabled="loading">
           <plus />
           <cached v-if="loading" class="rotate" />
+          <span v-if="uploadStatus === 'uploading'">Guardando y subiendo video... {{ uploadProgress }}%</span>
+          <span v-else-if="loading">Guardando...</span>
           <span v-else>Guardar cambios</span>
         </button>
       </form>
@@ -302,6 +331,10 @@ export default {
           right_point_id: p.right_point_id ?? null
         })) : null
 
+        if (videoChanged) {
+          this.uploadStatus = 'uploading';
+        }
+
         const result = await ExerciseService.saveExercise({
           exerciseId: this.$route.params.exercise_id,
           metadata: meta,
@@ -313,8 +346,15 @@ export default {
         })
 
         if (result.ok) {
+          if (videoChanged) {
+            this.uploadStatus = 'success';
+            this.uploadProgress = 100;
+            // Esperar 2 segundos para mostrar el mensaje de éxito
+            await new Promise(r => setTimeout(r, 2000));
+          }
           this.$router.push({ name: 'exercises' })
         } else {
+          this.uploadStatus = 'error';
           this.error_msg = `Error en ${result.step}`
         }
       } catch (error) {
@@ -355,8 +395,87 @@ export default {
       isModalVisible: false,
       error_msg: '',
       uploadProgress: 0,
+      uploadStatus: '', // '' | 'uploading' | 'success' | 'error'
       video: null,
     }
   },
 }
 </script>
+
+<style scoped>
+.video-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  margin-bottom: 8px;
+}
+.video-status-indicator.has-video {
+  background: #e8f5e9;
+  border: 1px solid #66bb6a;
+  color: #2e7d32;
+}
+.video-status-indicator.no-video {
+  background: #fbe9e7;
+  border: 1px solid #ef5350;
+  color: #c62828;
+}
+.video-status-icon { font-size: 1.2em; }
+.video-status-text { font-weight: 600; }
+.video-preview-link {
+  display: inline-block;
+  color: #4BC0C0;
+  font-size: 0.85em;
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+.video-preview-link:hover { text-decoration: underline; }
+.upload-progress-container {
+  position: relative;
+  width: 100%;
+  height: 22px;
+  background: #e0e0e0;
+  border-radius: 11px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+.upload-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4BC0C0, #36a2a2);
+  border-radius: 11px;
+  transition: width 0.3s ease;
+}
+.upload-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.75em;
+  font-weight: 700;
+  color: #fff;
+}
+.upload-status-msg {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+.upload-status-msg.uploading {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  color: #0d47a1;
+}
+.upload-status-msg.success {
+  background: #e8f5e9;
+  border: 1px solid #a5d6a7;
+  color: #1b5e20;
+}
+.upload-status-msg.error {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  color: #b71c1c;
+}
+</style>

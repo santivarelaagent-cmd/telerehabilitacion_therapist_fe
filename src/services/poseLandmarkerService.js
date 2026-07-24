@@ -1,8 +1,6 @@
-import {
-  PoseLandmarker,
-  FilesetResolver,
-  DrawingUtils
-} from "@mediapipe/tasks-vision";
+import { DrawingUtils, PoseLandmarker } from "@mediapipe/tasks-vision";
+import GeometryUtils from "../utils/geometryUtils";
+import mediaPipeProvider from "./mediaPipeProvider";
 
 export default class PoseLandmarkerService {
   constructor() {
@@ -19,72 +17,16 @@ export default class PoseLandmarkerService {
   async initialize() {
     console.log(`Inicializando PoseLandmarkerService (Modo solicitado: ${this.runningMode})...`);
     try {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-      );
-      
-      // Forzamos el literal de cadena para evitar problemas de referencia en MediaPipe
-      this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-          delegate: "GPU" 
-        },
-        runningMode: "VIDEO", // Forzado explícitamente aquí
-        numPoses: 1
-      });
-      
-      await this.poseLandmarker.setOptions({ runningMode: "VIDEO" });
-      
-      this.runningMode = "VIDEO";
-      console.log("PoseLandmarker inicializado correctamente en modo VIDEO.");
+      this.poseLandmarker = await mediaPipeProvider.getInstance(this.runningMode);
+      this.runningMode = mediaPipeProvider.runningMode;
+      console.log(`PoseLandmarkerService inicializado correctamente en modo ${this.runningMode}.`);
     } catch (error) {
-      console.error("Fallo inicialización en modo VIDEO:", error);
-      console.warn("Intentando fallback a modo IMAGE...");
-      
-      try {
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-        );
-        this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-            delegate: "GPU"
-          },
-          runningMode: "IMAGE",
-          numPoses: 1
-        });
-        this.runningMode = "IMAGE";
-        console.log("PoseLandmarker inicializado en modo IMAGE (Fallback).");
-      } catch (err2) {
-        console.error("Error total: No se pudo inicializar en ningún modo.", err2);
-      }
+      console.error("Fallo inicialización de PoseLandmarkerService:", error);
     }
   }
 
   createDrawingUtils(canvasCtx) {
     this.drawingUtils = new DrawingUtils(canvasCtx);
-  }
-
-  _calculateAngle(p1, p2, p3, width = 1, height = 1) {
-    const v1x = (p1.x - p2.x) * width;
-    const v1y = (p1.y - p2.y) * height;
-    const v2x = (p3.x - p2.x) * width;
-    const v2y = (p3.y - p2.y) * height;
-    const dotProduct = v1x * v2x + v1y * v2y;
-    const mag1 = Math.sqrt(v1x * v1x + v1y * v1y);
-    const mag2 = Math.sqrt(v2x * v2x + v2y * v2y);
-    if (mag1 === 0 || mag2 === 0) return 0;
-    return Math.acos(Math.min(1, Math.max(-1, dotProduct / (mag1 * mag2)))) * (180 / Math.PI);
-  }
-
-  _calculate3DAngle(p1, p2, p3) {
-    const v1x = p1.x - p2.x, v1y = p1.y - p2.y, v1z = p1.z - p2.z;
-    const v2x = p3.x - p2.x, v2y = p3.y - p2.y, v2z = p3.z - p2.z;
-    const dot = v1x * v2x + v1y * v2y + v1z * v2z;
-    const mag1 = Math.sqrt(v1x * v1x + v1y * v1y + v1z * v1z);
-    const mag2 = Math.sqrt(v2x * v2x + v2y * v2y + v2z * v2z);
-    if (mag1 === 0 || mag2 === 0) return 0;
-    return Math.acos(Math.min(1, Math.max(-1, dot / (mag1 * mag2)))) * (180 / Math.PI);
   }
 
   async detectForVideo(video, canvas, startTimeMs, trackedPoints = [], onResults = null, showAdjacents = false) {
@@ -202,13 +144,13 @@ export default class PoseLandmarkerService {
             if (leftPoint && rightPoint) {
               let angle;
               if (this.angleMode === '3d' && worldLandmark && worldLandmark[trackedPoint.id] && worldLandmark[trackedPoint.left_point] && worldLandmark[trackedPoint.right_point]) {
-                angle = this._calculate3DAngle(
+                angle = GeometryUtils.calculate3DAngle(
                   worldLandmark[trackedPoint.left_point],
                   worldLandmark[trackedPoint.id],
                   worldLandmark[trackedPoint.right_point]
                 );
               } else {
-                angle = this._calculateAngle(leftPoint, mainPoint, rightPoint, canvas.width, canvas.height);
+                angle = GeometryUtils.calculateAngle(leftPoint, mainPoint, rightPoint, canvas.width, canvas.height);
               }
               currentAngles[trackedPoint.codename] = angle;
               canvasCtx.fillStyle = 'yellow';
@@ -235,7 +177,6 @@ export default class PoseLandmarkerService {
    * referencias cacheadas. Llamar en beforeUnmount del componente que lo usa.
    */
   destroy() {
-    try { this.poseLandmarker?.close(); } catch (_) { /* no-op */ }
     this.poseLandmarker  = undefined;
     this.drawingUtils    = undefined;
     this._canvasCtx      = undefined;

@@ -1,22 +1,22 @@
-import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import MovementHistoryService from './movementHistoryService';
-
-const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm';
-const MODEL_PATH     = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+import GeometryUtils from '../utils/geometryUtils';
+import mediaPipeProvider from './mediaPipeProvider';
 
 /**
  * BackgroundAnalysisService
  *
- * Responsabilidad única: analizar un video completo en segundo plano a la
- * máxima velocidad posible, usando una instancia de MediaPipe y un elemento
- * <video> ocultos, completamente independientes del video que el usuario
- * controla para visualización.
+ * Responsabilidad única: analizar un video completo en segundo plano,
+ * usando una instancia de MediaPipe y un elemento <video> ocultos,
+ * completamente independientes del video que el usuario controla.
  *
- * Ventajas frente al enfoque basado en reproducción manual:
- *  - Sin cortes temporales: procesa cada frame en orden, de inicio a fin.
- *  - Sin interferencia con la UI: el usuario puede ver/pausar el video principal
- *    mientras el análisis corre en paralelo.
- *  - Velocidad: playbackRate máximo (~8x) → un video de 4 min termina en ~30 s.
+ * Estrategia: SEEK FRAME-A-FRAME
+ *  - El video se mantiene pausado en todo momento.
+ *  - Se hace seek a cada posición de frame (t += 1/fps) y se espera el
+ *    evento 'seeked' antes de correr MediaPipe.
+ *  - Esto GARANTIZA que cada frame se procesa: el decodificador nunca
+ *    puede saltar frames porque el video está pausado.
+ *  - Velocidad limitada por: tiempo de seek (~5ms) + MediaPipe (~25ms).
+ *    Un video de 11s a 30 FPS (~330 frames) tarda ~10s en analizarse.
  */
 class BackgroundAnalysisService {
   constructor() {
@@ -25,6 +25,7 @@ class BackgroundAnalysisService {
     this._isRunning      = false;
     this._rafId          = undefined; // Handle para cancelar el frame callback pendiente
     this._trackedPoints  = [];
+    this._workerTimer    = null;
 
     // Callbacks
     this._onFrame    = null;
@@ -32,34 +33,38 @@ class BackgroundAnalysisService {
     this._onComplete = null;
     this._onError    = null;
     this.angleMode   = "3d"; // "3d" | "2d"
+
+    if (typeof window !== 'undefined' && window.document) {
+      document.addEventListener('visibilitychange', () => {
+        if (this._isRunning) {
+          if (document.visibilityState === 'visible') {
+            this._stopWorkerTimer();
+            // Si hay un seek pendiente que no se procesó en segundo plano, reintentar
+            if (this._seekPending) {
+              this._seekPending = false;
+              this._seekToNextFrame();
+            }
+          } else {
+            this._startWorkerTimer();
+          }
+        }
+      });
+    }
   }
 
   setAngleMode(mode) {
     this.angleMode = mode;
   }
 
-  // ─── Inicialización ────────────────────────────────────────────────────────
-
-  /**
-   * Carga el modelo de MediaPipe. Llamar una sola vez; la instancia se reutiliza
-   * en análisis sucesivos.
-   */
   async initialize(exerciseId) {
-    if (this._poseLandmarker && exerciseId && this._exerciseId !== exerciseId) {
-      console.log(`[BackgroundAnalysisService] Recreando PoseLandmarker porque cambió de ejercicio de ${this._exerciseId} a ${exerciseId}`);
-      try { this._poseLandmarker.close(); } catch (_) { /* no-op */ }
+    if (exerciseId && this._exerciseId !== exerciseId) {
+      console.log(`[BackgroundAnalysisService] Nuevo ejercicio detectado: de ${this._exerciseId} a ${exerciseId}`);
       this._poseLandmarker = null;
     }
-    if (this._poseLandmarker) return;
-    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
-    this._poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: MODEL_PATH,
-        delegate: 'GPU',
-      },
-      runningMode: 'VIDEO',
-      numPoses: 1,
-    });
+    
+    if (!this._poseLandmarker) {
+      this._poseLandmarker = await mediaPipeProvider.getInstance('VIDEO');
+    }
   }
 
   isReady() {
@@ -79,13 +84,16 @@ class BackgroundAnalysisService {
    *   onComplete()                         — cuando el video termina
    *   onError(err)                         — si hay un error irrecuperable
    */
-  start(videoSrc, trackedPoints, exerciseId, { onFrame, onProgress, onComplete, onError, startTime = 0 } = {}) {
+  async start(videoSrc, trackedPoints, exerciseId, { onFrame, onProgress, onComplete, onError, startTime = 0, targetFps = 30, videoFps = 30 } = {}) {
     this._cleanupPreviousVideo();
     if (!this._poseLandmarker) throw new Error('BackgroundAnalysisService no inicializado.');
 
     this._exerciseId    = exerciseId;
     this._historyService = new MovementHistoryService(exerciseId);
-    this._historyService.loadFromStorage();
+    await this._historyService.loadFromStorage();
+    if (targetFps > 0) {
+      this._historyService.targetFps = targetFps;
+    }
 
     this._trackedPoints = trackedPoints;
     this._onFrame       = onFrame;
@@ -95,74 +103,73 @@ class BackgroundAnalysisService {
     this._isRunning     = true;
     this._lastTimestamp = undefined;
     this._lastSaveTime  = Date.now();
+    this._targetFps     = targetFps || 0;
+    this._detectedVideoFps = videoFps || 30;
+    this._avgProcessingTimeMs = 25;
+
+    // Calcular el paso de tiempo entre frames a analizar
+    const effectiveFps = this._targetFps > 0
+      ? Math.min(this._targetFps, this._detectedVideoFps)
+      : this._detectedVideoFps;
+    this._seekStep = 1 / effectiveFps;
+
+    // Posición inicial del seek
+    this._nextSeekTime = startTime > 0 ? startTime : 0;
 
     this._video = this._createHiddenVideo();
     this._video.src = videoSrc;
 
     this._video.addEventListener('loadedmetadata', () => {
-      const runWarmupAndPlay = () => {
+      if (!this._video || !this._isRunning) return;
+      this._videoDuration = this._video.duration;
+
+      const runWarmupAndSeekLoop = () => {
+        if (!this._video || !this._isRunning) return;
         try {
-          // Ejecutar una detección de calentamiento mientras el video está pausado
-          // para evitar que el video avance a 8x antes de que MediaPipe esté listo.
-          const initialTime = this._video.currentTime;
-          const warmupTimestamp = Math.round((initialTime || 0) * 1000);
-          console.log(`[BackgroundAnalysisService] Ejecutando frame de calentamiento en t = ${initialTime} s (timestamp: ${warmupTimestamp})`);
-          this._poseLandmarker.detectForVideo(this._video, warmupTimestamp);
+          // Frame de calentamiento para inicializar la GPU de MediaPipe
+          let warmupTimestamp = performance.now();
+          if (this._lastTimestamp !== undefined && warmupTimestamp <= this._lastTimestamp) {
+            warmupTimestamp = this._lastTimestamp + 1;
+          }
           this._lastTimestamp = warmupTimestamp;
+          console.log(`[BackgroundAnalysisService] Frame de calentamiento en t=${this._video.currentTime.toFixed(3)}s`);
+          this._poseLandmarker.detectForVideo(this._video, warmupTimestamp);
         } catch (e) {
-          console.warn('BackgroundAnalysisService: error en primer frame de calentamiento', e);
+          console.warn('BackgroundAnalysisService: error en frame de calentamiento', e);
         }
 
-        this._video.playbackRate = this._maxPlaybackRate();
-        this._video.play()
-          .then(() => this._scheduleNextFrame())
-          .catch(err => {
-            console.error('BackgroundAnalysisService: error al reproducir video oculto', err);
-            this._onError?.(err);
-          });
+        console.log(`[BackgroundAnalysisService] Iniciando análisis seek-frame-a-frame: FPS efectivo=${effectiveFps}, paso=${this._seekStep.toFixed(4)}s, inicio=${this._nextSeekTime.toFixed(3)}s, duración=${this._videoDuration.toFixed(2)}s`);
+        // Iniciar el loop de seek frame-a-frame
+        this._seekToNextFrame();
       };
 
       if (startTime > 0) {
-        // Reanudar desde el último punto analizado en lugar de desde el inicio
-        this._video.addEventListener('seeked', runWarmupAndPlay, { once: true });
+        this._video.addEventListener('seeked', runWarmupAndSeekLoop, { once: true });
         this._video.currentTime = startTime;
       } else {
         if (this._video.readyState >= 2) {
-          runWarmupAndPlay();
+          runWarmupAndSeekLoop();
         } else {
-          this._video.addEventListener('loadeddata', runWarmupAndPlay, { once: true });
+          this._video.addEventListener('loadeddata', runWarmupAndSeekLoop, { once: true });
         }
       }
-    }, { once: true });
-
-    this._video.addEventListener('ended', () => {
-      this._isRunning = false;
-      if (this._historyService) {
-        this._historyService.isComplete = true;
-        this._historyService.saveToStorage();
-      }
-      if (this._poseLandmarker) {
-        try { this._poseLandmarker.close(); } catch (_) { /* no-op */ }
-        this._poseLandmarker = null;
-      }
-      this._onComplete?.();
     }, { once: true });
 
     this._video.load();
   }
 
-  pause() {
+  async pause() {
     this._isRunning = false;
+    this._stopWorkerTimer();
     this._video?.pause();
-    this._historyService?.saveToStorage();
+    await this._historyService?.saveToStorage();
   }
 
   resume() {
     if (!this._video?.src) return;
     this._isRunning = true;
-    this._video.play()
-      .then(() => this._scheduleNextFrame())
-      .catch(console.error);
+    // Reanudar el loop de seek desde donde se quedó
+    this._seekToNextFrame();
   }
 
   /**
@@ -171,11 +178,11 @@ class BackgroundAnalysisService {
    */
   discard() {
     this._isRunning = false;
+    this._stopWorkerTimer();
     this._historyService?.reset();
     this._historyService = null;
     this._exerciseId = null;
     if (this._poseLandmarker) {
-      try { this._poseLandmarker.close(); } catch (_) { /* no-op */ }
       this._poseLandmarker = null;
     }
     if (this._video) {
@@ -205,7 +212,6 @@ class BackgroundAnalysisService {
   destroy() {
     this.discard();
     if (this._poseLandmarker) {
-      try { this._poseLandmarker.close(); } catch (_) { /* no-op */ }
       this._poseLandmarker = null;
     }
   }
@@ -251,6 +257,7 @@ class BackgroundAnalysisService {
 
   _cleanupPreviousVideo() {
     this._isRunning = false;
+    this._stopWorkerTimer();
     if (this._video) {
       if (this._rafId !== undefined) {
         if (this._video.cancelVideoFrameCallback) {
@@ -276,62 +283,152 @@ class BackgroundAnalysisService {
     const v = document.createElement('video');
     v.muted       = true;
     v.crossOrigin = 'anonymous';
-    // Fuera de la pantalla: no ocupa espacio, no es visible, no recibe eventos
+    // Dentro del viewport (visible para el navegador → decodificación HW activa)
+    // pero imperceptible para el usuario (4px, casi transparente, detrás de todo).
     v.style.cssText = [
       'position:fixed',
-      'left:-9999px',
-      'top:-9999px',
-      'width:1px',
-      'height:1px',
+      'left:0',
+      'top:0',
+      'width:4px',
+      'height:4px',
       'pointer-events:none',
-      'opacity:0',
+      'opacity:0.01',
+      'z-index:-9999',
     ].join(';');
     document.body.appendChild(v);
     return v;
   }
 
   _maxPlaybackRate() {
-    // La mayoría de navegadores soportan hasta 16x con requestVideoFrameCallback.
-    // Usamos 8x como valor seguro para asegurar que MediaPipe tenga tiempo suficiente.
-    return 8;
+    return 1; // No se usa en modo seek, pero se mantiene por compatibilidad
   }
 
-  _scheduleNextFrame() {
-    if (!this._isRunning || !this._video) return;
-
-    if (this._video.requestVideoFrameCallback) {
-      // Guardar el handle para poder cancelarlo en discard()
-      this._rafId = this._video.requestVideoFrameCallback((_, metadata) => this._processFrame(metadata));
-    } else {
-      this._rafId = requestAnimationFrame(() => this._processFrame(null));
-    }
+  _startWorkerTimer() {
+    if (this._workerTimer) return;
+    console.log('[BackgroundAnalysisService] Pestaña oculta. Activando temporizador en Web Worker para análisis continuo.');
+    const workerCode = `
+      let timerId = null;
+      self.onmessage = function(e) {
+        if (e.data.action === 'start') {
+          if (timerId) clearInterval(timerId);
+          timerId = setInterval(() => {
+            self.postMessage('tick');
+          }, 10);
+        } else if (e.data.action === 'stop') {
+          if (timerId) {
+            clearInterval(timerId);
+            timerId = null;
+          }
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    this._workerTimer = new Worker(url);
+    this._workerTimer.onmessage = () => {
+      if (this._isRunning && this._video && this._seekPending) {
+        // En pestaña oculta, el evento 'seeked' puede no dispararse.
+        // Usamos el worker para forzar el procesamiento.
+        this._seekPending = false;
+        this._processSeekFrame();
+      }
+    };
+    this._workerTimer.postMessage({ action: 'start' });
+    URL.revokeObjectURL(url);
   }
 
-  _processFrame(metadata) {
+  _stopWorkerTimer() {
+    if (!this._workerTimer) return;
+    console.log('[BackgroundAnalysisService] Pestaña visible. Deteniendo temporizador de Web Worker.');
+    this._workerTimer.postMessage({ action: 'stop' });
+    this._workerTimer.terminate();
+    this._workerTimer = null;
+  }
+
+  // ─── Motor de análisis: Seek frame-a-frame ─────────────────────────────────
+  //
+  // Estrategia: el video se mantiene PAUSADO en todo momento.
+  // 1. Se hace seek a la posición del siguiente frame (video.currentTime = t)
+  // 2. Se espera el evento 'seeked' (el decodificador ha cargado el frame)
+  // 3. Se corre MediaPipe detectForVideo sobre el frame pausado
+  // 4. Se avanza _nextSeekTime += _seekStep
+  // 5. Se repite hasta llegar al final del video
+  //
+  // Esto GARANTIZA que cada frame se procesa, porque el decodificador nunca
+  // puede saltar frames — el video está pausado.
+
+  /**
+   * Avanza al siguiente frame haciendo seek en el video pausado.
+   * Si hemos superado la duración, finaliza el análisis.
+   */
+  _seekToNextFrame() {
     const video = this._video;
-    if (!this._isRunning || !video || video.paused || video.ended) return;
+    if (!this._isRunning || !video) return;
+
+    const duration = this._videoDuration || video.duration;
+
+    // ¿Hemos terminado?
+    if (this._nextSeekTime >= duration) {
+      this._finishAnalysis();
+      return;
+    }
+
+    this._seekPending = true;
+
+    // Activar Web Worker si la pestaña está oculta (el evento 'seeked' puede retrasarse)
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      this._startWorkerTimer();
+    }
+
+    // Registrar el listener para cuando el seek complete
+    video.addEventListener('seeked', () => {
+      this._seekPending = false;
+      this._processSeekFrame();
+    }, { once: true });
+
+    // Ejecutar el seek
+    video.currentTime = this._nextSeekTime;
+  }
+
+  /**
+   * Procesa el frame actual (video pausado en la posición correcta)
+   * y luego avanza al siguiente.
+   */
+  _processSeekFrame() {
+    const video = this._video;
+    if (!this._isRunning || !video) return;
 
     try {
-      // Los timestamps deben ser monotónicamente crecientes por instancia.
-      let timestamp = (metadata && typeof metadata.mediaTime === 'number' && !isNaN(metadata.mediaTime))
-        ? metadata.mediaTime * 1000
-        : video.currentTime * 1000;
+      const currentTime = video.currentTime;
 
-      timestamp = Math.round(timestamp);
-      if (isNaN(timestamp)) {
-        timestamp = 0;
-      }
-
+      // Si estamos en modo VIDEO, necesitamos un timestamp monotónicamente creciente real
+      // performance.now() asegura que nunca enviaremos un timestamp menor al anterior.
+      let timestamp = performance.now();
       if (this._lastTimestamp !== undefined && timestamp <= this._lastTimestamp) {
         timestamp = this._lastTimestamp + 1;
       }
       this._lastTimestamp = timestamp;
 
       if (!this._poseLandmarker) {
-        console.warn('BackgroundAnalysisService: PoseLandmarker no disponible en _processFrame.');
+        console.warn('BackgroundAnalysisService: PoseLandmarker no disponible en _processSeekFrame.');
         return;
       }
-      const result = this._poseLandmarker.detectForVideo(video, timestamp);
+
+      const startDetect = performance.now();
+      let result;
+      if (mediaPipeProvider.runningMode === 'VIDEO') {
+        result = this._poseLandmarker.detectForVideo(video, timestamp);
+      } else {
+        result = this._poseLandmarker.detect(video);
+      }
+      const detectDuration = performance.now() - startDetect;
+
+      // Actualizar promedio de tiempo de detección (para estadísticas)
+      if (this._avgProcessingTimeMs === undefined) {
+        this._avgProcessingTimeMs = detectDuration;
+      } else {
+        this._avgProcessingTimeMs = this._avgProcessingTimeMs * 0.9 + detectDuration * 0.1;
+      }
 
       if (result.landmarks?.length > 0) {
         const landmark = result.landmarks[0];
@@ -355,65 +452,67 @@ class BackgroundAnalysisService {
           if (main && left && right) {
             let angle;
             if (this.angleMode === '3d' && worldLandmark && worldLandmark[point.id] && worldLandmark[point.left_point] && worldLandmark[point.right_point]) {
-              angle = this._calculate3DAngle(
+              angle = GeometryUtils.calculate3DAngle(
                 worldLandmark[point.left_point],
                 worldLandmark[point.id],
                 worldLandmark[point.right_point]
               );
             } else {
-              angle = this._calculateAngle(left, main, right, video.videoWidth, video.videoHeight);
+              angle = GeometryUtils.calculateAngle(left, main, right, video.videoWidth, video.videoHeight);
             }
             currentAngles[point.codename] = angle;
           }
         }
 
-        // Registrar frame en historial en segundo plano
-        this._historyService?.addFrame(video.currentTime, currentAngles, allCoords, video.duration);
+        // Registrar frame en historial
+        const duration = this._videoDuration || video.duration;
+        this._historyService?.addFrame(currentTime, currentAngles, allCoords, duration);
 
-        // Guardar en localStorage periódicamente
+        // Guardar en IndexedDB periódicamente
         const now = Date.now();
         if (now - (this._lastSaveTime || 0) > 3000) {
           this._historyService?.saveToStorage();
           this._lastSaveTime = now;
         }
 
-        this._onFrame?.(video.currentTime, currentAngles, allCoords);
+        this._onFrame?.(currentTime, currentAngles, allCoords);
       }
     } catch (e) {
-      console.error('BackgroundAnalysisService: error procesando frame', e);
+      console.error('BackgroundAnalysisService: error procesando frame en seek', e);
+      this._finishAnalysis();
+      return;
     }
 
-    if (video.duration) {
-      this._onProgress?.(video.currentTime, video.duration);
+    // Reportar progreso
+    const duration = this._videoDuration || video.duration;
+    if (duration) {
+      this._onProgress?.(this._nextSeekTime, duration);
     }
 
-    this._scheduleNextFrame();
+    // Avanzar al siguiente frame
+    this._nextSeekTime += this._seekStep;
+
+    // Ceder el hilo principal brevemente para no bloquear la UI,
+    // luego buscar el siguiente frame
+    setTimeout(() => this._seekToNextFrame(), 0);
   }
 
   /**
-   * Ángulo en el vértice p2 formado por los segmentos p1-p2 y p3-p2 (en grados).
+   * Finaliza el análisis: guarda el historial completo y libera MediaPipe.
    */
-  _calculateAngle(p1, p2, p3, width = 1, height = 1) {
-    const v1x = (p1.x - p2.x) * width, v1y = (p1.y - p2.y) * height;
-    const v2x = (p3.x - p2.x) * width, v2y = (p3.y - p2.y) * height;
-    const dot  = v1x * v2x + v1y * v2y;
-    const mag1 = Math.sqrt(v1x * v1x + v1y * v1y);
-    const mag2 = Math.sqrt(v2x * v2x + v2y * v2y);
-    if (mag1 === 0 || mag2 === 0) return 0;
-    // Clamp para evitar NaN por errores de punto flotante
-    return Math.acos(Math.min(1, Math.max(-1, dot / (mag1 * mag2)))) * (180 / Math.PI);
-  }
-
-  _calculate3DAngle(p1, p2, p3) {
-    const v1x = p1.x - p2.x, v1y = p1.y - p2.y, v1z = p1.z - p2.z;
-    const v2x = p3.x - p2.x, v2y = p3.y - p2.y, v2z = p3.z - p2.z;
-    const dot  = v1x * v2x + v1y * v2y + v1z * v2z;
-    const mag1 = Math.sqrt(v1x * v1x + v1y * v1y + v1z * v1z);
-    const mag2 = Math.sqrt(v2x * v2x + v2y * v2y + v2z * v2z);
-    if (mag1 === 0 || mag2 === 0) return 0;
-    return Math.acos(Math.min(1, Math.max(-1, dot / (mag1 * mag2)))) * (180 / Math.PI);
+  async _finishAnalysis() {
+    this._isRunning = false;
+    this._stopWorkerTimer();
+    if (this._historyService) {
+      this._historyService.isComplete = true;
+      await this._historyService.saveToStorage();
+    }
+    if (this._poseLandmarker) {
+      this._poseLandmarker = null;
+    }
+    console.log(`[BackgroundAnalysisService] Análisis completado. Frames procesados hasta t=${this._nextSeekTime.toFixed(3)}s`);
+    this._onComplete?.();
   }
 }
-
 const backgroundAnalysisServiceInstance = new BackgroundAnalysisService();
 export default backgroundAnalysisServiceInstance;

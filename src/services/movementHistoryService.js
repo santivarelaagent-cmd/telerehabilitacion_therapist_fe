@@ -8,6 +8,7 @@ export default class MovementHistoryService {
     this.exerciseId = exerciseId;
     this._map = {};
     this._processedSegments = new Set();
+    this.targetFps = 30; // Default
   }
 
   // ─── Acceso al historial ───────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export default class MovementHistoryService {
    * @returns {{ progress: number, isFirstResult: boolean }}
    */
   addFrame(currentTime, angles, coords, videoDuration) {
-    const key = currentTime.toFixed(2);
+    const key = currentTime.toFixed(4);
     const wasEmpty = !this.hasFrames();
 
     this._map[key] = {
@@ -54,9 +55,14 @@ export default class MovementHistoryService {
     const segment = Math.floor(currentTime * 10);
     this._processedSegments.add(segment);
 
+    if (videoDuration && (!this.videoDuration || this.videoDuration !== videoDuration)) {
+      this.videoDuration = videoDuration;
+    }
+
     let progress = 0;
-    if (videoDuration) {
-      const totalSegments = Math.ceil(videoDuration * 10);
+    const duration = this.videoDuration;
+    if (duration) {
+      const totalSegments = Math.ceil(duration * 10);
       progress = Math.min(100, Math.round((this._processedSegments.size / totalSegments) * 100));
     }
 
@@ -78,32 +84,59 @@ export default class MovementHistoryService {
 
   // ─── Persistencia localStorage ─────────────────────────────────────────────
 
-  saveToStorage() {
+  async saveToStorage() {
     try {
       const payload = {
         map: this._map,
         segments: Array.from(this._processedSegments),
         duration: this.videoDuration,
         isComplete: this.isComplete,
+        targetFps: this.targetFps,
       };
       const key = `exercise_${this.exerciseId}_history`;
-      console.log(`[HistoryService] Guardando en ${key}, frames: ${Object.keys(this._map).length}, segmentos: ${this._processedSegments.size}, duracion: ${this.videoDuration}, completado: ${this.isComplete}`);
-      localStorage.setItem(key, JSON.stringify(payload));
+      console.log(`[HistoryService] Guardando en IndexedDB para ${key}, frames: ${Object.keys(this._map).length}, segmentos: ${this._processedSegments.size}, duracion: ${this.videoDuration}, completado: ${this.isComplete}, fps: ${this.targetFps}`);
+      const { setHistory } = await import('./dbService');
+      await setHistory(key, payload);
     } catch (e) {
-      console.warn('El historial de movimiento en caché es grande y puede que no quepa en localStorage.', e);
+      console.error('Error guardando historial de movimiento en IndexedDB:', e);
     }
   }
 
-  loadFromStorage() {
+  async loadFromStorage() {
     const key = `exercise_${this.exerciseId}_history`;
-    console.log(`[HistoryService] Intentando cargar desde ${key}...`);
-    const cached = localStorage.getItem(key);
-    if (!cached) {
+    console.log(`[HistoryService] Intentando cargar desde IndexedDB: ${key}...`);
+    
+    let cachedData = null;
+    try {
+      const { getHistory } = await import('./dbService');
+      cachedData = await getHistory(key);
+    } catch (err) {
+      console.warn('[HistoryService] Error leyendo de IndexedDB, intentando localStorage:', err);
+    }
+
+    if (!cachedData) {
+      console.log(`[HistoryService] No se encontró en IndexedDB. Buscando en localStorage: ${key}`);
+      const localCached = localStorage.getItem(key);
+      if (localCached) {
+        try {
+          cachedData = JSON.parse(localCached);
+          const { setHistory } = await import('./dbService');
+          await setHistory(key, cachedData);
+          localStorage.removeItem(key);
+          console.log(`[HistoryService] Migrados datos de ${key} desde localStorage a IndexedDB.`);
+        } catch (e) {
+          console.error('[HistoryService] Error migrando de localStorage:', e);
+        }
+      }
+    }
+
+    if (!cachedData) {
       console.log(`[HistoryService] No hay datos guardados para ${key}`);
       return false;
     }
+
     try {
-      const parsed = JSON.parse(cached);
+      const parsed = cachedData;
       if (parsed) {
         if (parsed.duration) {
           this.videoDuration = parsed.duration;
@@ -112,6 +145,11 @@ export default class MovementHistoryService {
           this.isComplete = parsed.isComplete;
         } else {
           this.isComplete = false;
+        }
+        if (parsed.targetFps !== undefined) {
+          this.targetFps = parsed.targetFps;
+        } else {
+          this.targetFps = 30;
         }
         if (parsed.map) {
           this._map = parsed.map;
@@ -148,15 +186,21 @@ export default class MovementHistoryService {
   }
 
   /**
-   * Descarta todos los frames en memoria y elimina el caché de localStorage.
+   * Descarta todos los frames en memoria y elimina el caché de localStorage e IndexedDB.
    */
-  reset() {
+  async reset() {
     const key = `exercise_${this.exerciseId}_history`;
-    console.log(`[HistoryService] Borrando clave ${key}`);
+    console.log(`[HistoryService] Borrando clave ${key} de localStorage e IndexedDB`);
     this._map = {};
     this._processedSegments = new Set();
     this.videoDuration = undefined;
     this.isComplete = false;
     localStorage.removeItem(key);
+    try {
+      const { deleteHistory } = await import('./dbService');
+      await deleteHistory(key);
+    } catch (e) {
+      console.error('Error borrando historial en IndexedDB:', e);
+    }
   }
 }
