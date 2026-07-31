@@ -51,9 +51,10 @@ export default {
   props: {
     videoSrc: { type: String, required: true },
     trackedPoints: { type: Array, required: true, default: () => [] },
-    angleMode: { type: String, required: true, default: '3d' }
+    angleMode: { type: String, required: true, default: '3d' },
+    mediaPipeModel: { type: String, required: false, default: 'lite' }
   },
-  emits: ['update:angleMode', 'metadata-loaded', 'progress-update'],
+  emits: ['update:angleMode', 'metadata-loaded', 'progress-update', 'model-changing'],
   data() {
     return {
       showSkeleton: true,
@@ -63,7 +64,7 @@ export default {
   async mounted() {
     this.poseService = new PoseLandmarkerService();
     this.poseService.setAngleMode(this.angleMode);
-    await this.poseService.initialize();
+    await this.poseService.initialize(this.mediaPipeModel);
   },
   beforeUnmount() {
     this.detectionActive = false;
@@ -72,6 +73,25 @@ export default {
   watch: {
     angleMode(newMode) {
       this.poseService?.setAngleMode(newMode);
+    },
+    async mediaPipeModel(newModel) {
+      if (this.poseService) {
+        const wasActive = this.detectionActive;
+        this.stopDetection();
+        this.$emit('model-changing', true);
+        
+        // Darle un respiro al DOM para que actualice la UI antes del bloqueo intenso de WebAssembly/GPU
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        await this.poseService.initialize(newModel);
+        
+        this.$emit('model-changing', false);
+        if (wasActive) {
+          this.startDetection();
+        } else {
+          this.detectSingleFrame();
+        }
+      }
     }
   },
   methods: {
@@ -193,6 +213,10 @@ export default {
           );
         } catch (e) {
           console.error('Error en renderLoop:', e);
+          import('../../services/mediaPipeProvider').then(({ default: provider }) => {
+            provider.destroy();
+          });
+          this.stopDetection();
         }
         if (!this.detectionActive) return;
         

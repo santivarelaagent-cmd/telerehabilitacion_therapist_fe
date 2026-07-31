@@ -1,4 +1,4 @@
-import MovementHistoryService from './movementHistoryService';
+// MovementHistoryService is now injected from the caller (view_exercise) to avoid duplicate instances
 import GeometryUtils from '../utils/geometryUtils';
 import mediaPipeProvider from './mediaPipeProvider';
 
@@ -26,6 +26,14 @@ class BackgroundAnalysisService {
     this._rafId          = undefined; // Handle para cancelar el frame callback pendiente
     this._trackedPoints  = [];
     this._workerTimer    = null;
+    this._lastYieldTime  = 0;
+
+    // MessageChannel para ceder el hilo principal sin ser ralentizado en pestañas ocultas.
+    // Chrome fuerza setTimeout a mínimo 1 segundo en background, pero MessageChannel no tiene esa restricción.
+    this._yieldChannel = new MessageChannel();
+    this._yieldChannel.port1.onmessage = () => {
+      if (this._isRunning) this._seekToNextFrame();
+    };
 
     // Callbacks
     this._onFrame    = null;
@@ -52,19 +60,25 @@ class BackgroundAnalysisService {
     }
   }
 
+  /**
+   * Cede el hilo al event loop usando MessageChannel (no throttled en pestañas ocultas).
+   */
+  _scheduleNextFrame() {
+    this._yieldChannel.port2.postMessage(null);
+  }
+
   setAngleMode(mode) {
     this.angleMode = mode;
   }
 
-  async initialize(exerciseId) {
+  async initialize(exerciseId, modelType = 'lite') {
     if (exerciseId && this._exerciseId !== exerciseId) {
       console.log(`[BackgroundAnalysisService] Nuevo ejercicio detectado: de ${this._exerciseId} a ${exerciseId}`);
       this._poseLandmarker = null;
     }
     
-    if (!this._poseLandmarker) {
-      this._poseLandmarker = await mediaPipeProvider.getInstance('VIDEO');
-    }
+    // Si queremos un modelo distinto al cargado (o no hay ninguno), pedimos la instancia
+    this._poseLandmarker = await mediaPipeProvider.getInstance('VIDEO', modelType);
   }
 
   isReady() {
@@ -84,16 +98,13 @@ class BackgroundAnalysisService {
    *   onComplete()                         — cuando el video termina
    *   onError(err)                         — si hay un error irrecuperable
    */
-  async start(videoSrc, trackedPoints, exerciseId, { onFrame, onProgress, onComplete, onError, startTime = 0, targetFps = 30, videoFps = 30 } = {}) {
+  async start(videoSrc, trackedPoints, exerciseId, { onFrame, onProgress, onComplete, onError, startTime = 0, targetFps = 30, videoFps = 30, historyService = null } = {}) {
     this._cleanupPreviousVideo();
     if (!this._poseLandmarker) throw new Error('BackgroundAnalysisService no inicializado.');
 
     this._exerciseId    = exerciseId;
-    this._historyService = new MovementHistoryService(exerciseId);
-    await this._historyService.loadFromStorage();
-    if (targetFps > 0) {
-      this._historyService.targetFps = targetFps;
-    }
+    // Usar la instancia compartida de MovementHistoryService en lugar de crear una propia
+    this._historyService = historyService;
 
     this._trackedPoints = trackedPoints;
     this._onFrame       = onFrame;
@@ -136,6 +147,11 @@ class BackgroundAnalysisService {
           this._poseLandmarker.detectForVideo(this._video, warmupTimestamp);
         } catch (e) {
           console.warn('BackgroundAnalysisService: error en frame de calentamiento', e);
+          import('./mediaPipeProvider').then(({ default: provider }) => {
+            provider.destroy();
+          });
+          this._finishAnalysis();
+          return;
         }
 
         console.log(`[BackgroundAnalysisService] Iniciando análisis seek-frame-a-frame: FPS efectivo=${effectiveFps}, paso=${this._seekStep.toFixed(4)}s, inicio=${this._nextSeekTime.toFixed(3)}s, duración=${this._videoDuration.toFixed(2)}s`);
@@ -156,6 +172,22 @@ class BackgroundAnalysisService {
     }, { once: true });
 
     this._video.load();
+
+    this._onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        this._startWorkerTimer();
+        // Si no hay seek pendiente, podríamos estar esperando un rAF. Forzamos el siguiente frame.
+        if (this._isRunning && !this._seekPending) {
+          this._seekToNextFrame();
+        }
+      } else {
+        this._stopWorkerTimer();
+      }
+    };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this._onVisibilityChange);
+    }
   }
 
   async pause() {
@@ -201,6 +233,10 @@ class BackgroundAnalysisService {
       this._video.load(); // Libera el recurso de red y decodificador de video
       if (document.body.contains(this._video)) document.body.removeChild(this._video);
       this._video = null;
+    }
+    if (typeof document !== 'undefined' && this._onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this._onVisibilityChange);
+      this._onVisibilityChange = null;
     }
     this._onFrame = this._onProgress = this._onComplete = this._onError = null;
   }
@@ -470,7 +506,7 @@ class BackgroundAnalysisService {
 
         // Guardar en IndexedDB periódicamente
         const now = Date.now();
-        if (now - (this._lastSaveTime || 0) > 3000) {
+        if (now - (this._lastSaveTime || 0) > 15000) {
           this._historyService?.saveToStorage();
           this._lastSaveTime = now;
         }
@@ -479,6 +515,12 @@ class BackgroundAnalysisService {
       }
     } catch (e) {
       console.error('BackgroundAnalysisService: error procesando frame en seek', e);
+      // Si MediaPipe falla catastróficamente (ej. timestamp error o C++ graph error),
+      // la instancia interna se corrompe. Destruimos la instancia global para que se
+      // regenere desde cero en el próximo intento.
+      import('./mediaPipeProvider').then(({ default: provider }) => {
+        provider.destroy();
+      });
       this._finishAnalysis();
       return;
     }
@@ -492,9 +534,21 @@ class BackgroundAnalysisService {
     // Avanzar al siguiente frame
     this._nextSeekTime += this._seekStep;
 
-    // Ceder el hilo principal brevemente para no bloquear la UI,
-    // luego buscar el siguiente frame
-    setTimeout(() => this._seekToNextFrame(), 0);
+    // El evento 'seeked' ya proporciona un punto de cesión natural al event loop
+    // (es asíncrono, pasa por la cola de eventos del navegador).
+    // Solo necesitamos ceder explícitamente cada ~150ms para que el navegador pinte la UI.
+    //
+    // IMPORTANTE: NO usamos setTimeout aquí porque Chrome lo ralentiza a 1 segundo
+    // mínimo en pestañas ocultas, lo que destruiría el rendimiento.
+    // MessageChannel.postMessage NO tiene esa restricción.
+    const now = performance.now();
+    if (now - (this._lastYieldTime || 0) > 150) {
+      this._lastYieldTime = now;
+      this._scheduleNextFrame();
+    } else {
+      // Llamada directa — el seeked event sigue siendo asíncrono, así que no hay riesgo de stack overflow
+      this._seekToNextFrame();
+    }
   }
 
   /**
@@ -503,14 +557,13 @@ class BackgroundAnalysisService {
   async _finishAnalysis() {
     this._isRunning = false;
     this._stopWorkerTimer();
-    if (this._historyService) {
-      this._historyService.isComplete = true;
-      await this._historyService.saveToStorage();
-    }
+    const frameCount = this._historyService ? Object.keys(this._historyService._map).length : 0;
     if (this._poseLandmarker) {
       this._poseLandmarker = null;
     }
-    console.log(`[BackgroundAnalysisService] Análisis completado. Frames procesados hasta t=${this._nextSeekTime.toFixed(3)}s`);
+    console.log(`[BackgroundAnalysisService] Análisis completado. Frames procesados: ${frameCount}, hasta t=${this._nextSeekTime.toFixed(3)}s`);
+    // El guardado final se delega al callback onComplete de la vista,
+    // que usa la misma instancia de historyService compartida.
     this._onComplete?.();
   }
 }

@@ -1,7 +1,11 @@
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 const MEDIAPIPE_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm';
-const MODEL_PATH = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const MODEL_PATHS = {
+  lite: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+  full: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+  heavy: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task'
+};
 
 /**
  * MediaPipeProvider (Singleton)
@@ -14,39 +18,47 @@ class MediaPipeProvider {
     this._poseLandmarker = null;
     this._initializationPromise = null;
     this.runningMode = 'VIDEO';
+    this.currentModelType = 'lite';
   }
 
   /**
    * Inicializa o devuelve la instancia ya inicializada de PoseLandmarker.
    * @param {string} mode 'VIDEO' o 'IMAGE'
+   * @param {string} modelType 'lite', 'full', o 'heavy'
    * @returns {Promise<PoseLandmarker>}
    */
-  async getInstance(mode = 'VIDEO') {
-    if (this._poseLandmarker) {
+  async getInstance(mode = 'VIDEO', modelType = 'lite') {
+    if (this._poseLandmarker && this.currentModelType === modelType) {
       return this._poseLandmarker;
+    }
+
+    // Si cambió el modelo, destruimos el anterior
+    if (this._poseLandmarker && this.currentModelType !== modelType) {
+      this.destroy();
     }
 
     if (this._initializationPromise) {
       return this._initializationPromise;
     }
 
-    this._initializationPromise = this._initialize(mode);
+    this._initializationPromise = this._initialize(mode, modelType);
     return this._initializationPromise;
   }
 
-  async _initialize(mode) {
-    console.log(`[MediaPipeProvider] Inicializando PoseLandmarker (Modo: ${mode})...`);
+  async _initialize(mode, modelType) {
+    console.log(`[MediaPipeProvider] Inicializando PoseLandmarker (Modo: ${mode}, Modelo: ${modelType})...`);
     try {
       const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
       this._poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
-          modelAssetPath: MODEL_PATH,
+          modelAssetPath: MODEL_PATHS[modelType] || MODEL_PATHS['lite'],
           delegate: 'GPU',
         },
         runningMode: mode,
         numPoses: 1,
       });
       this.runningMode = mode;
+      this.currentModelType = modelType;
       console.log(`[MediaPipeProvider] PoseLandmarker inicializado correctamente.`);
       return this._poseLandmarker;
     } catch (error) {
@@ -59,13 +71,14 @@ class MediaPipeProvider {
           const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
           this._poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
             baseOptions: {
-              modelAssetPath: MODEL_PATH,
+              modelAssetPath: MODEL_PATHS[modelType] || MODEL_PATHS['lite'],
               delegate: 'GPU',
             },
             runningMode: 'IMAGE',
             numPoses: 1,
           });
           this.runningMode = 'IMAGE';
+          this.currentModelType = modelType;
           console.log('[MediaPipeProvider] PoseLandmarker inicializado en modo IMAGE (Fallback).');
           return this._poseLandmarker;
         } catch (fallbackError) {

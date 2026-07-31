@@ -16,24 +16,40 @@
       </span>
     </div>
 
-    <!-- Selector de Frecuencia de Muestreo (FPS) -->
-    <div class="fps-selector-container">
-      <span class="fps-label">Muestreo:</span>
-      <select
-        id="fps-select"
-        :value="targetFps"
-        @change="$emit('update:targetFps', Number($event.target.value))"
-        :disabled="!['idle', 'complete'].includes(analysisState)"
-        class="fps-select"
-      >
-        <option :value="15">15 FPS (Ligero)</option>
-        <option :value="30" :disabled="nativeVideoFps < 30">30 FPS</option>
-        <option :value="60" :disabled="nativeVideoFps < 60">60 FPS</option>
-        <option :value="80" :disabled="nativeVideoFps < 80">80 FPS</option>
-        <option :value="0">Original (Máx)</option>
-      </select>
-    </div>
+    <div class="settings-bar" style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+      <!-- Selector de Frecuencia de Muestreo (FPS) -->
+      <div class="fps-selector-container">
+        <span class="fps-label">Muestreo:</span>
+        <select
+          id="fps-select"
+          :value="targetFps"
+          @change="$emit('update:targetFps', Number($event.target.value))"
+          :disabled="!['idle', 'complete'].includes(analysisState)"
+          class="fps-select"
+        >
+          <option :value="15">15 FPS (Ligero)</option>
+          <option :value="30" :disabled="nativeVideoFps < 30">30 FPS</option>
+          <option :value="60" :disabled="nativeVideoFps < 60">60 FPS</option>
+          <option :value="80" :disabled="nativeVideoFps < 80">80 FPS</option>
+          <option :value="0">Original (Máx)</option>
+        </select>
+      </div>
 
+      <!-- Selector de Modelo MediaPipe -->
+      <div class="fps-selector-container">
+        <span class="fps-label">Modelo:</span>
+        <select
+          :value="mediaPipeModel"
+          @change="$emit('update:mediaPipeModel', $event.target.value)"
+          :disabled="!['idle', 'complete'].includes(analysisState)"
+          class="fps-select"
+        >
+          <option value="lite">Lite (Rápido)</option>
+          <option value="full">Full (Balanceado)</option>
+          <option value="heavy">Heavy (Preciso)</option>
+        </select>
+      </div>
+    </div>
     <div class="analysis-actions">
       <button
         class="btn analysis-btn btn-start"
@@ -74,10 +90,11 @@ export default {
     isEngineReady: { type: Boolean, required: true },
     analysisProgress: { type: Number, required: true },
     targetFps: { type: Number, required: true },
-    nativeVideoFps: { type: Number, required: true },
-    hasResultsFlag: { type: Boolean, required: true },
+    nativeVideoFps: { type: Number, default: 30 },
+    hasResultsFlag: { type: Boolean, default: false },
+    mediaPipeModel: { type: String, default: 'lite' }
   },
-  emits: ['start', 'pause', 'discard', 'update:targetFps']
+  emits: ['start', 'pause', 'discard', 'update:targetFps', 'update:mediaPipeModel']
 }
 </script>
 
@@ -135,6 +152,7 @@ export default {
 }
 
 .analysis-badge {
+  font-family: 'Open Sans', sans-serif;
   font-size: 0.85em;
   font-weight: 600;
   padding: 5px 14px;
@@ -150,6 +168,7 @@ export default {
 }
 
 .engine-badge {
+  font-family: 'Open Sans', sans-serif;
   font-size: 0.85em;
   font-weight: 600;
   padding: 5px 14px;
@@ -178,6 +197,7 @@ export default {
 }
 
 .analysis-btn {
+  font-family: 'Outfit', sans-serif;
   display: flex;
   align-items: center;
   gap: 8px;

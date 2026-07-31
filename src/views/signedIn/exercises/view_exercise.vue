@@ -18,6 +18,7 @@
             :videoSrc="exercise.video"
             :trackedPoints="tracked_points"
             v-model:angleMode="angleMode"
+            :mediaPipeModel="mediaPipeModel"
             @metadata-loaded="calculateInitialProgress"
           />
           
@@ -33,7 +34,9 @@
             :targetFps="targetFps"
             :nativeVideoFps="nativeVideoFps"
             :hasResultsFlag="hasResultsFlag"
+            :mediaPipeModel="mediaPipeModel"
             @update:targetFps="targetFps = $event"
+            @update:mediaPipeModel="mediaPipeModel = $event"
             @start="startAnalysis"
             @pause="pauseAnalysis"
             @discard="discardAnalysis"
@@ -155,6 +158,7 @@ export default {
       isEngineReady: false,
       nativeVideoFps: 30,
       videoDuration: 0, // Keep track of duration received from player
+      mediaPipeModel: localStorage.getItem('mediaPipeModelPref') || 'lite', // 'lite', 'full', 'heavy'
     };
   },
   async beforeMount() {
@@ -192,6 +196,9 @@ export default {
       if (this._backgroundService) {
         this._backgroundService.setAngleMode(newVal);
       }
+    },
+    mediaPipeModel(newVal) {
+      localStorage.setItem('mediaPipeModelPref', newVal);
     }
   },
   methods: {
@@ -419,7 +426,7 @@ export default {
       this.analysisState = 'initializing';
       this.isEngineReady = false;
       try {
-        await this._backgroundService.initialize(this.exercise.id);
+        await this._backgroundService.initialize(this.exercise.id, this.mediaPipeModel);
         this.isEngineReady = true;
       } catch (e) {
         console.error('Error inicializando análisis en segundo plano:', e);
@@ -445,6 +452,7 @@ export default {
           startTime:  resumeTime,
           targetFps:  this.targetFps,
           videoFps:   this.nativeVideoFps,
+          historyService: this._historyService,
           onFrame:    (t, angles, coords) => this._onBackgroundFrame(t, angles, coords),
           onProgress: (currentTime, duration) => {
             const p = this._historyService.calculateProgress(duration);
@@ -475,14 +483,10 @@ export default {
         }
       }
 
-      this._historyService.addFrame(currentTime, angles, coords, null);
-      this.hasResultsFlag = this._historyService.hasFrames();
-
+      // Los frames ya se guardan en el historial compartido por backgroundAnalysisService.
+      // Solo actualizamos flags de UI aquí.
+      this.hasResultsFlag = true;
       const now = Date.now();
-      if (now - (this._lastSaveTime || 0) > 3000) {
-        this._historyService.saveToStorage();
-        this._lastSaveTime = now;
-      }
 
       if (this.showCharts && now - (this._lastChartUpdate || 0) > 500) {
         const stats = this._chartService.refreshCharts(

@@ -14,10 +14,10 @@ export default class PoseLandmarkerService {
     this.angleMode = mode;
   }
 
-  async initialize() {
-    console.log(`Inicializando PoseLandmarkerService (Modo solicitado: ${this.runningMode})...`);
+  async initialize(modelType = 'lite') {
+    console.log(`Inicializando PoseLandmarkerService (Modo solicitado: ${this.runningMode}, Modelo: ${modelType})...`);
     try {
-      this.poseLandmarker = await mediaPipeProvider.getInstance(this.runningMode);
+      this.poseLandmarker = await mediaPipeProvider.getInstance(this.runningMode, modelType);
       this.runningMode = mediaPipeProvider.runningMode;
       console.log(`PoseLandmarkerService inicializado correctamente en modo ${this.runningMode}.`);
     } catch (error) {
@@ -169,6 +169,7 @@ export default class PoseLandmarkerService {
       }
     } catch (error) {
       console.error("Error en detectForVideo:", error);
+      throw error;
     }
   }
 
