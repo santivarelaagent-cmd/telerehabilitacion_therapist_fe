@@ -3,7 +3,8 @@ import { Chart } from 'chart.js';
 /**
  * ExerciseChartService
  * Responsabilidad única: construir, actualizar y destruir las instancias
- * de Chart.js para el análisis de movimiento del ejercicio.
+ * de Chart.js para el análisis de movimiento del ejercicio, incluyendo
+ * la superposición comparativa con datos de referencia de laboratorio (Ground Truth).
  */
 export default class ExerciseChartService {
 
@@ -14,7 +15,7 @@ export default class ExerciseChartService {
 
   // ─── Helpers privados ──────────────────────────────────────────────────────
 
-  _buildDatasets(point, historyArr, chartType) {
+  _buildDatasets(point, historyArr, chartType, labReferenceMap = {}) {
     if (chartType === 'posicion') {
       const xs = [], ys = [], zs = [];
       for (const frame of historyArr) {
@@ -36,20 +37,46 @@ export default class ExerciseChartService {
     }
 
     // chartType === 'angulo'
-    const angles = historyArr.map(frame =>
+    const mpAngles = historyArr.map(frame =>
       frame.angles && frame.angles[point.codename] !== undefined
         ? frame.angles[point.codename]
         : null
     );
+
+    const datasets = [
+      {
+        label: 'Ángulo MediaPipe (Grados)',
+        data: mpAngles,
+        borderColor: '#9966FF',
+        borderWidth: 2.2,
+        pointRadius: 0,
+        tension: 0.1,
+      },
+    ];
+
+    // Si existen datos de referencia de laboratorio para este punto articular:
+    const labRef = labReferenceMap && labReferenceMap[point.codename];
+    if (labRef && Array.isArray(labRef.data) && labRef.data.length > 0) {
+      datasets.push({
+        label: labRef.label || 'Referencia Lab (Ground Truth)',
+        data: labRef.data,
+        borderColor: '#E53935', // Rojo vibrante para referencia
+        backgroundColor: 'rgba(229, 57, 53, 0.05)',
+        borderWidth: 2.5,
+        pointRadius: 0,
+        tension: 0.1,
+        borderDash: [6, 4], // Línea segmentada elegante para distinguir referencia
+      });
+    }
+
     return {
-      datasets: [
-        { label: 'Ángulo (Grados)', data: angles, borderColor: '#9966FF', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-      ],
+      datasets,
       yAxisTitle: 'Grados (°)',
+      errorMetrics: labRef ? labRef.errorMetrics : null,
     };
   }
 
-  _computeStats(datasets) {
+  _computeStats(datasets, errorMetrics = null) {
     const stats = [];
     for (const ds of datasets) {
       const valid = ds.data.filter(v => v !== null && !isNaN(v));
@@ -63,9 +90,23 @@ export default class ExerciseChartService {
           max: max.toFixed(2),
           avg: avg.toFixed(2),
           color: ds.borderColor,
+          isReference: ds.borderColor === '#E53935',
         });
       }
     }
+
+    if (errorMetrics && errorMetrics.samples > 0) {
+      stats.push({
+        label: 'Precisión vs Lab',
+        isMetric: true,
+        mae: errorMetrics.mae,
+        rmse: errorMetrics.rmse,
+        maxError: errorMetrics.maxError,
+        samples: errorMetrics.samples,
+        color: '#E53935',
+      });
+    }
+
     return stats;
   }
 
@@ -76,9 +117,10 @@ export default class ExerciseChartService {
    * @param {Array}  trackedPoints
    * @param {Array}  historyArr
    * @param {string} chartType  'posicion' | 'angulo'
+   * @param {Object} labReferenceMap Mapeo de ángulos de laboratorio { [codename]: { data: [], errorMetrics: {} } }
    * @returns {Object.<string, Array>} chartStats por codename
    */
-  buildCharts(trackedPoints, historyArr, chartType) {
+  buildCharts(trackedPoints, historyArr, chartType, labReferenceMap = {}) {
     const times = historyArr.map(f => f.t);
     const statsMap = {};
 
@@ -88,8 +130,8 @@ export default class ExerciseChartService {
 
       this._instances[point.codename]?.destroy();
 
-      const { datasets, yAxisTitle } = this._buildDatasets(point, historyArr, chartType);
-      statsMap[point.codename] = this._computeStats(datasets);
+      const { datasets, yAxisTitle, errorMetrics } = this._buildDatasets(point, historyArr, chartType, labReferenceMap);
+      statsMap[point.codename] = this._computeStats(datasets, errorMetrics);
 
       this._instances[point.codename] = new Chart(canvas, {
         type: 'line',
@@ -99,7 +141,16 @@ export default class ExerciseChartService {
           maintainAspectRatio: false,
           animation: false,
           interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { position: 'top' } },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 8,
+                font: { size: 12, family: "'Open Sans', sans-serif" },
+              },
+            },
+          },
           scales: {
             x: { title: { display: true, text: 'Tiempo (segundos)' } },
             y: { title: { display: true, text: yAxisTitle } },
@@ -116,9 +167,10 @@ export default class ExerciseChartService {
    * @param {Array}  trackedPoints
    * @param {Array}  historyArr
    * @param {string} chartType
+   * @param {Object} labReferenceMap
    * @returns {Object.<string, Array>} chartStats actualizado
    */
-  refreshCharts(trackedPoints, historyArr, chartType) {
+  refreshCharts(trackedPoints, historyArr, chartType, labReferenceMap = {}) {
     const times = historyArr.map(f => f.t);
     const statsMap = {};
 
@@ -128,12 +180,21 @@ export default class ExerciseChartService {
 
       chart.data.labels = times;
 
-      const { datasets } = this._buildDatasets(point, historyArr, chartType);
-      chart.data.datasets.forEach((ds, i) => {
-        if (datasets[i]) ds.data = datasets[i].data;
-      });
+      const { datasets, errorMetrics } = this._buildDatasets(point, historyArr, chartType, labReferenceMap);
+      
+      // Si cambia la cantidad de datasets (ej. se agregó o removió referencia), reconstruir
+      if (chart.data.datasets.length !== datasets.length) {
+        chart.data.datasets = datasets;
+      } else {
+        chart.data.datasets.forEach((ds, i) => {
+          if (datasets[i]) {
+            ds.data = datasets[i].data;
+            ds.label = datasets[i].label;
+          }
+        });
+      }
 
-      statsMap[point.codename] = this._computeStats(chart.data.datasets);
+      statsMap[point.codename] = this._computeStats(chart.data.datasets, errorMetrics);
       chart.update('none'); // Sin animación para máximo rendimiento
     }
 

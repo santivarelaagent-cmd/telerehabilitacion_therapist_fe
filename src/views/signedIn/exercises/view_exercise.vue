@@ -76,7 +76,20 @@
             :trackedPoints="tracked_points"
             :chartStats="chartStats"
             v-model:chartType="chartType"
+            :hasLabReference="!!labConfig"
+            :labFileName="labConfig ? labConfig.filename : ''"
+            :labTimeOffset="labConfig ? labConfig.timeOffset : 0"
+            @open-lab-modal="isLabModalVisible = true"
             @refresh="generateCharts"
+          />
+
+          <LabReferenceModal
+            :visible="isLabModalVisible"
+            :trackedPoints="tracked_points"
+            :initialConfig="labConfig"
+            @close="isLabModalVisible = false"
+            @apply="onLabReferenceApplied"
+            @clear="onLabReferenceCleared"
           />
         </template>
       </div>
@@ -133,6 +146,8 @@ import BackgroundAnalysisService  from '@/services/backgroundAnalysisService';
 import ExerciseVideoPlayer from '@/components/exercises/ExerciseVideoPlayer.vue';
 import ExerciseAnalysisPanel from '@/components/exercises/ExerciseAnalysisPanel.vue';
 import ExerciseCharts from '@/components/exercises/ExerciseCharts.vue';
+import LabReferenceModal from '@/components/exercises/LabReferenceModal.vue';
+import { LabAngleCalculator } from '@/services/labAngleCalculator';
 
 Chart.register(...registerables);
 
@@ -140,7 +155,7 @@ export default {
   name: 'ViewExercise',
   components: { 
     VideoAccount, RunFast, Upload, Download, ChartLine, Cube, FileExcel,
-    ExerciseVideoPlayer, ExerciseAnalysisPanel, ExerciseCharts
+    ExerciseVideoPlayer, ExerciseAnalysisPanel, ExerciseCharts, LabReferenceModal
   },
   data() {
     return {
@@ -151,7 +166,7 @@ export default {
       showCharts: false,
       chartStats: {},
       analysisProgress: 0,
-      chartType: 'posicion',
+      chartType: 'angulo',
       analysisState: 'idle',
       angleMode: '3d',
       targetFps: 30,
@@ -159,6 +174,9 @@ export default {
       nativeVideoFps: 30,
       videoDuration: 0, // Keep track of duration received from player
       mediaPipeModel: localStorage.getItem('mediaPipeModelPref') || 'lite', // 'lite', 'full', 'heavy'
+      isLabModalVisible: false,
+      labConfig: null,
+      labReferenceMap: {},
     };
   },
   async beforeMount() {
@@ -270,6 +288,7 @@ export default {
         if (ready) {
           await this._loadTrackedPoints();
           await this._loadDifficulties();
+          this._loadLabConfigFromStorage();
           if (this.exercise.video) {
             this.detectVideoFpsSilently(this.exercise.video).then(detectedFps => {
               this.nativeVideoFps = detectedFps;
@@ -489,8 +508,9 @@ export default {
       const now = Date.now();
 
       if (this.showCharts && now - (this._lastChartUpdate || 0) > 500) {
+        this._computeLabReferenceMap();
         const stats = this._chartService.refreshCharts(
-          this.tracked_points, this._historyService.getHistoryArray(), this.chartType
+          this.tracked_points, this._historyService.getHistoryArray(), this.chartType, this.labReferenceMap
         );
         this.chartStats = { ...this.chartStats, ...stats };
         this._lastChartUpdate = now;
@@ -520,11 +540,96 @@ export default {
       this.isEngineReady = false;
     },
 
+    _loadLabConfigFromStorage() {
+      if (!this.exercise?.id) return;
+      try {
+        const stored = localStorage.getItem(`labRef_${this.exercise.id}`);
+        if (stored) {
+          this.labConfig = JSON.parse(stored);
+          this._computeLabReferenceMap();
+        }
+      } catch (e) {
+        console.warn('No se pudo cargar la configuración de laboratorio previa:', e);
+      }
+    },
+
+    onLabReferenceApplied(config) {
+      this.labConfig = config;
+      if (this.exercise?.id) {
+        try {
+          localStorage.setItem(`labRef_${this.exercise.id}`, JSON.stringify(config));
+        } catch (e) {
+          console.warn('No se pudo guardar la configuración de lab en localStorage:', e);
+        }
+      }
+      this._computeLabReferenceMap();
+      this.generateCharts();
+    },
+
+    onLabReferenceCleared() {
+      this.labConfig = null;
+      this.labReferenceMap = {};
+      if (this.exercise?.id) {
+        localStorage.removeItem(`labRef_${this.exercise.id}`);
+      }
+      this.generateCharts();
+    },
+
+    _computeLabReferenceMap() {
+      if (!this.labConfig || !this.labConfig.parsedData || !this._historyService) {
+        this.labReferenceMap = {};
+        return;
+      }
+
+      const historyArr = this._historyService.getHistoryArray();
+      const targetTimes = historyArr.map(f => f.t);
+      const newRefMap = {};
+
+      const { parsedData, mappings, timeOffset } = this.labConfig;
+
+      for (const point of this.tracked_points) {
+        const mapping = mappings && mappings[point.codename];
+        if (mapping && mapping.center && mapping.left && mapping.right) {
+          // 1) Calcular serie de ángulos en el tiempo original del laboratorio
+          const labAngleSeries = LabAngleCalculator.computeAngleSeries(
+            parsedData.frames,
+            mapping.center,
+            mapping.left,
+            mapping.right
+          );
+
+          // 2) Interpolar y alinear con los timestamps del video MediaPipe aplicando el offset
+          const alignedAngles = LabAngleCalculator.alignToTargetTimeline(
+            targetTimes,
+            labAngleSeries,
+            timeOffset || 0
+          );
+
+          // 3) Extraer la serie predicha de MediaPipe para calcular métricas de discrepancia
+          const predictedAngles = historyArr.map(f =>
+            f.angles && f.angles[point.codename] !== undefined ? f.angles[point.codename] : null
+          );
+
+          // 4) Calcular MAE, RMSE y error máximo
+          const errorMetrics = LabAngleCalculator.calculateErrorMetrics(predictedAngles, alignedAngles);
+
+          newRefMap[point.codename] = {
+            label: `Referencia Lab (${mapping.left}-${mapping.center}-${mapping.right})`,
+            data: alignedAngles,
+            errorMetrics,
+          };
+        }
+      }
+
+      this.labReferenceMap = newRefMap;
+    },
+
     generateCharts() {
       this.showCharts = true;
+      this._computeLabReferenceMap();
       this.$nextTick(() => {
         this.chartStats = this._chartService.buildCharts(
-          this.tracked_points, this._historyService.getHistoryArray(), this.chartType
+          this.tracked_points, this._historyService.getHistoryArray(), this.chartType, this.labReferenceMap
         );
       });
     },
