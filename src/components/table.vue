@@ -1,5 +1,29 @@
 <template>
   <div class="table">
+    <!-- Barra de búsqueda -->
+    <div class="table__search">
+      <div class="table__search-box">
+        <span class="table__search-icon" aria-hidden="true">🔍</span>
+        <input
+          type="text"
+          v-model="searchQuery"
+          @input="onSearchInput"
+          @keyup.enter="triggerSearchNow"
+          class="table__search-input"
+          placeholder="Buscar por nombre, descripción o ID..."
+        />
+        <button
+          v-if="searchQuery"
+          type="button"
+          class="table__search-clear"
+          title="Limpiar búsqueda"
+          @click="clearSearch"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+
     <div class="table__header">
       <div
         class="table__header--item dark-bg"
@@ -177,6 +201,7 @@ export default {
         currentPage: this.currentPage,
         pageSize: this.pageSize,
         sortOrder: this.sortOrder,
+        searchQuery: this.searchQuery,
       });
     },
     restoreTableState() {
@@ -185,6 +210,43 @@ export default {
       if (saved.currentPage) this.currentPage = saved.currentPage;
       if (saved.pageSize) this.pageSize = saved.pageSize;
       if (saved.sortOrder) this.sortOrder = saved.sortOrder;
+      if (typeof saved.searchQuery === "string") this.searchQuery = saved.searchQuery;
+    },
+    normalizeText(val) {
+      return String(val ?? "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    },
+    onSearchInput() {
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer);
+      }
+      this.searchTimer = setTimeout(() => {
+        this.applySearch();
+      }, 300);
+    },
+    triggerSearchNow() {
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer);
+        this.searchTimer = null;
+      }
+      this.applySearch();
+    },
+    clearSearch() {
+      this.searchQuery = "";
+      this.triggerSearchNow();
+    },
+    applySearch() {
+      this.currentPage = 1;
+      this.saveTableState();
+      if (this.isServerPaginated) {
+        this.callAPI(false);
+      } else {
+        this.sortClientRows();
+        this.totalItems = this.all_rows.length;
+        this.sliceClientPage();
+      }
     },
     isSortableColumn(idx) {
       return Boolean(
@@ -207,7 +269,11 @@ export default {
     buildEndpointUrl() {
       const separator = this.api_endpoint.includes("?") ? "&" : "?";
       const orderingParam = `${this.sortOrder === "desc" ? "-" : ""}${this.sorting_column || "id"}`;
-      return `${this.api_endpoint}${separator}page=${this.currentPage}&page_size=${this.pageSize}&ordering=${orderingParam}`;
+      const trimmedSearch = (this.searchQuery || "").trim();
+      const searchParam = trimmedSearch
+        ? `&search=${encodeURIComponent(trimmedSearch)}`
+        : "";
+      return `${this.api_endpoint}${separator}page=${this.currentPage}&page_size=${this.pageSize}&ordering=${orderingParam}${searchParam}`;
     },
     async callAPI(forceRefresh = false) {
       this.loading = true;
@@ -239,7 +305,17 @@ export default {
       return String(valA ?? "").localeCompare(String(valB ?? ""), undefined, { numeric: true }) * dir;
     },
     sortClientRows() {
-      const sortedRaw = [...this.raw_rows].sort((a, b) => this.compareBySortColumn(a, b));
+      const trimmed = this.normalizeText((this.searchQuery || "").trim());
+      const filteredRaw = trimmed
+        ? this.raw_rows.filter((row) =>
+            this.columns.some((col) =>
+              this.normalizeText(get(row, col.query)).includes(trimmed)
+            )
+          )
+        : this.raw_rows;
+      const sortedRaw = [...filteredRaw].sort((a, b) =>
+        this.compareBySortColumn(a, b)
+      );
       this.all_rows = sortedRaw.map((row) =>
         this.columns.map((column) => get(row, column.query))
       );
@@ -332,6 +408,12 @@ export default {
     this.callAPI(false);
   },
 
+  beforeUnmount() {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+    }
+  },
+
   data() {
     return {
       loading: false,
@@ -345,6 +427,8 @@ export default {
       pageSize: 20,
       totalItems: 0,
       sortOrder: "asc",
+      searchQuery: "",
+      searchTimer: null,
     };
   },
 };
@@ -355,6 +439,54 @@ export default {
   width: 100%;
   display: flex;
   flex-direction: column;
+}
+.table__search {
+  display: flex;
+  align-items: center;
+  padding: 0 10px 14px 10px;
+}
+.table__search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.table__search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 0.95rem;
+  pointer-events: none;
+  opacity: 0.65;
+}
+.table__search-input {
+  width: 100%;
+  padding: 10px 38px 10px 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.table__search-input:focus {
+  border-color: #1e293b;
+  box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.12);
+}
+.table__search-clear {
+  position: absolute;
+  right: 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.table__search-clear:hover {
+  background: #f1f5f9;
+  color: #0f172a;
 }
 .table__header {
   display: flex;
