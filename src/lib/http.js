@@ -11,6 +11,8 @@ class Http {
         }
 
         this.storage = new Storage()
+        this.cache = new Map()
+        this.inFlight = new Map()
 
         if (typeof Http.instance === 'object') {
             return Http.instance
@@ -18,6 +20,54 @@ class Http {
 
         Http.instance = this
         return this
+    }
+
+    _cloneResponse(resp) {
+        try {
+            return JSON.parse(JSON.stringify(resp))
+        } catch (e) {
+            return resp
+        }
+    }
+
+    _getResourcePrefix(endpoint) {
+        const cleanPath = (endpoint || '').split('?')[0]
+        const firstSegment = cleanPath.split('/').filter(Boolean)[0]
+        return firstSegment ? `/${firstSegment}` : '/'
+    }
+
+    clearCache() {
+        this.cache.clear()
+        this.inFlight.clear()
+    }
+
+    invalidateCache(endpoint = null) {
+        if (!endpoint) {
+            this.clearCache()
+            return
+        }
+        const prefix = this._getResourcePrefix(endpoint)
+        const prefixesToInvalidate = new Set([prefix])
+
+        // Invalidar recursos relacionados cuando hay relaciones anidadas
+        if (prefix === '/exercises') {
+            prefixesToInvalidate.add('/routines')
+            prefixesToInvalidate.add('/therapies')
+        } else if (prefix === '/routines') {
+            prefixesToInvalidate.add('/therapies')
+        } else if (prefix === '/scheduled_training') {
+            prefixesToInvalidate.add('/training')
+        }
+
+        for (const key of Array.from(this.cache.keys())) {
+            const pathPart = key.startsWith(this.APIUrl) ? key.slice(this.APIUrl.length) : key
+            for (const p of prefixesToInvalidate) {
+                if (pathPart.startsWith(p)) {
+                    this.cache.delete(key)
+                    break
+                }
+            }
+        }
     }
 
     async manageFetch(url, method, body = {}, headers = {}) {
@@ -81,42 +131,81 @@ class Http {
         return {Authorization: `Token ${localStorage.getItem('access_token')}`}
     }
 
-    async get(endpoint, headers = {}) {
-        return await this.manageFetch(this.APIUrl + endpoint, 'GET', {}, headers)
+    async get(endpoint, headers = {}, options = {}) {
+        const fullUrl = this.APIUrl + endpoint
+        const forceRefresh = Boolean(options && options.forceRefresh)
+
+        if (!forceRefresh && this.cache.has(fullUrl)) {
+            return this._cloneResponse(this.cache.get(fullUrl))
+        }
+
+        if (!forceRefresh && this.inFlight.has(fullUrl)) {
+            const sharedResp = await this.inFlight.get(fullUrl)
+            return this._cloneResponse(sharedResp)
+        }
+
+        const promise = this.manageFetch(fullUrl, 'GET', {}, headers).then((resp) => {
+            this.inFlight.delete(fullUrl)
+            if (resp && !resp.error && resp.status >= 200 && resp.status < 300) {
+                this.cache.set(fullUrl, this._cloneResponse(resp))
+            }
+            return resp
+        }).catch((err) => {
+            this.inFlight.delete(fullUrl)
+            throw err
+        })
+
+        this.inFlight.set(fullUrl, promise)
+        const result = await promise
+        return this._cloneResponse(result)
     }
 
     async post(endpoint, body, headers = {}) {
-        return await this.manageFetch(this.APIUrl + endpoint, 'POST', body, headers)
+        const resp = await this.manageFetch(this.APIUrl + endpoint, 'POST', body, headers)
+        if (endpoint.includes('login')) {
+            this.clearCache()
+        } else {
+            this.invalidateCache(endpoint)
+        }
+        return resp
     }
 
     async put(endpoint, body, headers = {}) {
-        return await this.manageFetch(this.APIUrl + endpoint, 'PUT', body, headers)
+        const resp = await this.manageFetch(this.APIUrl + endpoint, 'PUT', body, headers)
+        this.invalidateCache(endpoint)
+        return resp
     }
 
     async patch(endpoint, body, headers = {}) {
-        return await this.manageFetch(
+        const resp = await this.manageFetch(
             this.APIUrl + endpoint,
             'PATCH',
             body,
             headers
         )
+        this.invalidateCache(endpoint)
+        return resp
     }
 
     async delete(endpoint, headers = {}) {
-        return await this.manageFetch(this.APIUrl + endpoint, 'DELETE', {}, headers)
+        const resp = await this.manageFetch(this.APIUrl + endpoint, 'DELETE', {}, headers)
+        this.invalidateCache(endpoint)
+        return resp
     }
 
     async postFormData(endpoint, form, headers = {}) {
-        return await this.manageFetchFormData(
+        const resp = await this.manageFetchFormData(
             this.APIUrl + endpoint,
             'POST',
             form,
             headers
         )
+        this.invalidateCache(endpoint)
+        return resp
     }
 
-    async authGet(endpoint) {
-        return await this.get(endpoint, this.authHeader())
+    async authGet(endpoint, options = {}) {
+        return await this.get(endpoint, this.authHeader(), options)
     }
 
     async authPost(endpoint, body) {

@@ -3,6 +3,7 @@ import {
     storageRef,
     uploadBytesResumable,
     getDownloadURL,
+    deleteObject,
 } from '@/lib/firebase'
 
 class FirebaseService {
@@ -34,6 +35,19 @@ class FirebaseService {
             )
         })
     }
+
+    async deleteFile(fileUrlOrPath) {
+        if (!fileUrlOrPath) return false
+        try {
+            const ref = storageRef(storage, fileUrlOrPath)
+            await deleteObject(ref)
+            return true
+        } catch (error) {
+            console.warn('Error al eliminar archivo de Firebase Storage:', error)
+            return false
+        }
+    }
 }
 
 export default new FirebaseService()
+

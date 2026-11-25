@@ -22,6 +22,7 @@
 <script>
 import ListModel from "../../../components/listModel";
 import Http from "@/lib/http";
+import FirebaseService from "@/lib/firebaseService";
 
 export default {
   name: "Exercises",
@@ -36,15 +37,34 @@ export default {
       });
     },
     async goToDelete(id) {
-      const confirmed = confirm(`¿Estás seguro de que deseas eliminar el ejercicio #${id}? Esta acción no se puede deshacer.`);
+      const confirmed = confirm(`¿Estás seguro de que deseas eliminar el ejercicio #${id}? Esta acción eliminará el ejercicio y su video asociado en Firebase.`);
       if (!confirmed) return;
 
       try {
         const http = new Http();
+
+        // 1. Obtener la información del ejercicio para conocer la URL de su video en Firebase si existe
+        let videoUrl = null;
+        try {
+          const detailResp = await http.authGet(`/exercises/${id}/`);
+          const data = detailResp.data || (detailResp.request?.json ? await detailResp.request.json() : null);
+          if (data && data.video) {
+            videoUrl = data.video;
+          }
+        } catch (fetchErr) {
+          console.warn('No se pudo obtener el detalle del ejercicio antes de borrar:', fetchErr);
+        }
+
+        // 2. Eliminar el registro en la base de datos de Django
         const response = await http.authDelete(`/exercises/${id}/`);
         const status = response.request?.status ?? response.status;
         if (status === 204 || status === 200) {
-          alert('Ejercicio eliminado correctamente.');
+          // 3. Si se eliminó de Django y tenía un video alojado en Firebase, eliminarlo de Firebase Storage
+          if (videoUrl && (videoUrl.includes('firebasestorage.googleapis.com') || videoUrl.includes('firebase'))) {
+            await FirebaseService.deleteFile(videoUrl);
+          }
+
+          alert('Ejercicio y video eliminados correctamente.');
           // Refrescar la página para actualizar la lista
           this.$router.go(0);
         } else {

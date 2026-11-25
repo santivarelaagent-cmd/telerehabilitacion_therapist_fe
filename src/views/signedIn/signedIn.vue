@@ -1,7 +1,7 @@
 <template>
-  <navbar @toggle-sidebar="toggle_sidebar" :key="$router" />
+  <navbar @toggle-sidebar="toggle_sidebar" />
   <div class="content">
-    <sidebar :open="open_sidebar" :key="$router" />
+    <sidebar :open="open_sidebar" />
     <router-view />
   </div>
 </template>

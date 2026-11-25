@@ -30,6 +30,7 @@
 <script>
 import { Account, Logout, CardAccountDetails, Menu } from "mdue";
 import Storage from "../lib/storage";
+import Http from "../lib/http";
 
 export default {
   name: "Navbar",
@@ -43,6 +44,7 @@ export default {
     logout() {
       const storage = new Storage();
       storage.removeToken();
+      new Http().clearCache();
       this.$router.push("/login");
     },
     toggle_sidebar() {

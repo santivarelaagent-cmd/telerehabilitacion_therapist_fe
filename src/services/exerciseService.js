@@ -55,6 +55,12 @@ class ExerciseService {
         if (![200, 201].includes(status)) {
           return { ok: false, step: "video", response: uploadResp };
         }
+
+        // Si se subió un nuevo video con éxito y había un video anterior en Firebase, borrar el anterior
+        if (existingVideoUrl && (existingVideoUrl.includes('firebasestorage.googleapis.com') || existingVideoUrl.includes('firebase'))) {
+          FirebaseService.deleteFile(existingVideoUrl).catch(e => console.warn('No se pudo borrar el video anterior en Firebase:', e));
+        }
+
         return { ok: true, step: "video", response: uploadResp };
       } catch (err) {
         return { ok: false, step: "video", error: err };

@@ -340,7 +340,7 @@ export default {
           metadata: meta,
           file: this.video,
           points: points,
-          existingVideoUrl: (ptsChanged && !videoChanged) ? this.exercise.video : null,
+          existingVideoUrl: this.exercise.video || null,
           useFirebase: true,
           onProgress: (pct) => (this.uploadProgress = pct),
         })

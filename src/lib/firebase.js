@@ -4,6 +4,7 @@ import {
   ref as storageRef,
   uploadBytesResumable,
   getDownloadURL,
+  deleteObject,
 } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -19,4 +20,4 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 const storage = getStorage(app)
 
-export { storage, storageRef, uploadBytesResumable, getDownloadURL }
+export { storage, storageRef, uploadBytesResumable, getDownloadURL, deleteObject }

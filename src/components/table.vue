@@ -12,19 +12,19 @@
     <div class="table__loading" v-if="loading">
       <span class="dark-text regular-font">Cargando...</span>
     </div>
-    <div class="table__loading" v-if="table_data.length === 0">
+    <div class="table__loading" v-else-if="table_data.length === 0">
       <span class="dark-text regular-font">No hay información</span>
     </div>
-    <div class="table__data" v-if="!loading">
+    <div class="table__data" v-if="!loading && table_data.length > 0">
       <div
         class="table__data__row light-bg"
         v-for="(row, idx) in table_data"
-        :key="idx"
+        :key="row[0] !== undefined ? row[0] : idx"
       >
         <div
           class="table__data__cell light-bg"
-          v-for="(cell, idx) in row"
-          :key="idx"
+          v-for="(cell, cIdx) in row"
+          :key="cIdx"
         >
           <span class="dark-text light-font">{{ cell }}</span>
         </div>
@@ -62,6 +62,59 @@
         </div>
       </div>
     </div>
+
+    <!-- Barra de paginación y actualización manual -->
+    <div class="table__pagination" v-if="!loading && totalItems > 0">
+      <div class="pagination__info dark-text light-font">
+        Mostrando {{ rangeStart }}–{{ rangeEnd }} de {{ totalItems }} registros
+      </div>
+
+      <div class="pagination__controls">
+        <label class="pagination__size dark-text light-font">
+          Por página:
+          <select v-model.number="pageSize" @change="onPageSizeChange" class="pagination__select">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+        </label>
+
+        <button
+          class="pagination__btn"
+          :disabled="currentPage <= 1"
+          @click="goToPage(currentPage - 1)"
+        >
+          ‹ Anterior
+        </button>
+
+        <button
+          v-for="page in visiblePages"
+          :key="page"
+          class="pagination__btn"
+          :class="{ 'pagination__btn--active': page === currentPage }"
+          @click="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+
+        <button
+          class="pagination__btn"
+          :disabled="currentPage >= totalPages"
+          @click="goToPage(currentPage + 1)"
+        >
+          Siguiente ›
+        </button>
+
+        <button
+          class="pagination__btn pagination__btn--refresh"
+          title="Recargar desde el servidor"
+          @click="refreshData"
+        >
+          ↻ Actualizar
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -80,11 +133,44 @@ export default {
     EyePlus,
   },
 
+  computed: {
+    totalPages() {
+      return Math.max(1, Math.ceil(this.totalItems / this.pageSize));
+    },
+    rangeStart() {
+      if (this.totalItems === 0) return 0;
+      return (this.currentPage - 1) * this.pageSize + 1;
+    },
+    rangeEnd() {
+      return Math.min(this.currentPage * this.pageSize, this.totalItems);
+    },
+    visiblePages() {
+      const total = this.totalPages;
+      const current = this.currentPage;
+      const maxButtons = 5;
+      let start = Math.max(1, current - Math.floor(maxButtons / 2));
+      let end = Math.min(total, start + maxButtons - 1);
+      if (end - start + 1 < maxButtons) {
+        start = Math.max(1, end - maxButtons + 1);
+      }
+      const pages = [];
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      return pages;
+    },
+  },
+
   methods: {
-    async callAPI() {
+    buildEndpointUrl() {
+      const separator = this.api_endpoint.includes("?") ? "&" : "?";
+      return `${this.api_endpoint}${separator}page=${this.currentPage}&page_size=${this.pageSize}`;
+    },
+    async callAPI(forceRefresh = false) {
       this.loading = true;
       const http = new Http();
-      const response = await http.authGet(this.api_endpoint);
+      const endpoint = this.buildEndpointUrl();
+      const response = await http.authGet(endpoint, { forceRefresh });
       this.mapData(response);
       this.loading = false;
     },
@@ -95,25 +181,71 @@ export default {
       }
     },
     mapData(response) {
-      if (response.status !== 200) {
+      if (!response || response.status !== 200) {
         console.error("Error on fetch");
+        this.table_data = [];
+        this.all_rows = [];
+        this.totalItems = 0;
         return;
       }
-      console.log(response.data)
-      if (Object.prototype.hasOwnProperty.call(response.data, "results")) {
-        console.log('herer')
-        response.data.results
-          .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
-          .forEach((row) =>
-            this.table_data.push(this.columns.map((column) => get(row, column.query)))
-          );
+
+      if (
+        response.data &&
+        Object.prototype.hasOwnProperty.call(response.data, "results")
+      ) {
+        this.isServerPaginated = true;
+        this.totalItems =
+          typeof response.data.count === "number"
+            ? response.data.count
+            : response.data.results.length;
+        const rows = [...response.data.results].sort(
+          (a, b) => a[this.sorting_column] - b[this.sorting_column]
+        );
+        this.table_data = rows.map((row) =>
+          this.columns.map((column) => get(row, column.query))
+        );
+      } else if (Array.isArray(response.data)) {
+        this.isServerPaginated = false;
+        const rows = [...response.data].sort(
+          (a, b) => a[this.sorting_column] - b[this.sorting_column]
+        );
+        this.all_rows = rows.map((row) =>
+          this.columns.map((column) => get(row, column.query))
+        );
+        this.totalItems = this.all_rows.length;
+        this.sliceClientPage();
       } else {
-        response.data
-          .sort((a, b) => a[this.sorting_column] - b[this.sorting_column])
-          .forEach((row) =>
-            this.table_data.push(this.columns.map((column) => get(row, column.query)))
-          );
+        this.table_data = [];
+        this.all_rows = [];
+        this.totalItems = 0;
       }
+    },
+    sliceClientPage() {
+      const start = (this.currentPage - 1) * this.pageSize;
+      const end = start + this.pageSize;
+      this.table_data = this.all_rows.slice(start, end);
+    },
+    goToPage(page) {
+      if (page < 1 || page > this.totalPages || page === this.currentPage) {
+        return;
+      }
+      this.currentPage = page;
+      if (this.isServerPaginated) {
+        this.callAPI(false);
+      } else {
+        this.sliceClientPage();
+      }
+    },
+    onPageSizeChange() {
+      this.currentPage = 1;
+      if (this.isServerPaginated) {
+        this.callAPI(false);
+      } else {
+        this.sliceClientPage();
+      }
+    },
+    refreshData() {
+      this.callAPI(true);
     },
   },
 
@@ -127,9 +259,8 @@ export default {
       return;
     }
     this.has_actions = this.actions.length !== 0;
-    console.log("this.has_actions", this.has_actions, this.actions)
     this.mapHeader();
-    this.callAPI();
+    this.callAPI(false);
   },
 
   data() {
@@ -138,6 +269,11 @@ export default {
       columns_header: [],
       has_actions: false,
       table_data: [],
+      all_rows: [],
+      isServerPaginated: false,
+      currentPage: 1,
+      pageSize: 20,
+      totalItems: 0,
     };
   },
 };
@@ -189,5 +325,71 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 10px;
+}
+.table__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+.pagination__info {
+  font-size: 0.9rem;
+  color: #475569;
+}
+.pagination__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pagination__size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+  font-size: 0.88rem;
+}
+.pagination__select {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1e293b;
+  cursor: pointer;
+}
+.pagination__btn {
+  padding: 6px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.pagination__btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.pagination__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pagination__btn--active {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+  font-weight: 600;
+}
+.pagination__btn--active:hover:not(:disabled) {
+  background: #0f172a;
+}
+.pagination__btn--refresh {
+  margin-left: 6px;
+  background: #f8fafc;
 }
 </style>
