@@ -3,10 +3,16 @@
     <div class="table__header">
       <div
         class="table__header--item dark-bg"
+        :class="{ 'table__header--sortable': isSortableColumn(idx) }"
         v-for="(column, idx) in columns_header"
         :key="idx"
+        @click="isSortableColumn(idx) && toggleSortOrder()"
+        :title="isSortableColumn(idx) ? (sortOrder === 'asc' ? 'Ordenar descendente' : 'Ordenar ascendente') : ''"
       >
         <span class="header--title light-text light-font">{{ column }}</span>
+        <span v-if="isSortableColumn(idx)" class="header--sort-icon light-text">
+          {{ sortOrder === 'asc' ? '▲' : '▼' }}
+        </span>
       </div>
     </div>
     <div class="table__loading" v-if="loading">
@@ -162,9 +168,27 @@ export default {
   },
 
   methods: {
+    isSortableColumn(idx) {
+      return Boolean(
+        this.columns &&
+          this.columns[idx] &&
+          this.columns[idx].query === this.sorting_column
+      );
+    },
+    toggleSortOrder() {
+      this.sortOrder = this.sortOrder === "asc" ? "desc" : "asc";
+      this.currentPage = 1;
+      if (this.isServerPaginated) {
+        this.callAPI(false);
+      } else {
+        this.sortClientRows();
+        this.sliceClientPage();
+      }
+    },
     buildEndpointUrl() {
       const separator = this.api_endpoint.includes("?") ? "&" : "?";
-      return `${this.api_endpoint}${separator}page=${this.currentPage}&page_size=${this.pageSize}`;
+      const orderingParam = `${this.sortOrder === "desc" ? "-" : ""}${this.sorting_column || "id"}`;
+      return `${this.api_endpoint}${separator}page=${this.currentPage}&page_size=${this.pageSize}&ordering=${orderingParam}`;
     },
     async callAPI(forceRefresh = false) {
       this.loading = true;
@@ -180,11 +204,27 @@ export default {
         this.columns_header.push("Acciones");
       }
     },
+    compareBySortColumn(a, b) {
+      const dir = this.sortOrder === "desc" ? -1 : 1;
+      const valA = get(a, this.sorting_column);
+      const valB = get(b, this.sorting_column);
+      if (typeof valA === "number" && typeof valB === "number") {
+        return (valA - valB) * dir;
+      }
+      return String(valA ?? "").localeCompare(String(valB ?? ""), undefined, { numeric: true }) * dir;
+    },
+    sortClientRows() {
+      const sortedRaw = [...this.raw_rows].sort((a, b) => this.compareBySortColumn(a, b));
+      this.all_rows = sortedRaw.map((row) =>
+        this.columns.map((column) => get(row, column.query))
+      );
+    },
     mapData(response) {
       if (!response || response.status !== 200) {
         console.error("Error on fetch");
         this.table_data = [];
         this.all_rows = [];
+        this.raw_rows = [];
         this.totalItems = 0;
         return;
       }
@@ -198,25 +238,22 @@ export default {
           typeof response.data.count === "number"
             ? response.data.count
             : response.data.results.length;
-        const rows = [...response.data.results].sort(
-          (a, b) => a[this.sorting_column] - b[this.sorting_column]
+        const rows = [...response.data.results].sort((a, b) =>
+          this.compareBySortColumn(a, b)
         );
         this.table_data = rows.map((row) =>
           this.columns.map((column) => get(row, column.query))
         );
       } else if (Array.isArray(response.data)) {
         this.isServerPaginated = false;
-        const rows = [...response.data].sort(
-          (a, b) => a[this.sorting_column] - b[this.sorting_column]
-        );
-        this.all_rows = rows.map((row) =>
-          this.columns.map((column) => get(row, column.query))
-        );
+        this.raw_rows = [...response.data];
+        this.sortClientRows();
         this.totalItems = this.all_rows.length;
         this.sliceClientPage();
       } else {
         this.table_data = [];
         this.all_rows = [];
+        this.raw_rows = [];
         this.totalItems = 0;
       }
     },
@@ -270,10 +307,12 @@ export default {
       has_actions: false,
       table_data: [],
       all_rows: [],
+      raw_rows: [],
       isServerPaginated: false,
       currentPage: 1,
       pageSize: 20,
       totalItems: 0,
+      sortOrder: "asc",
     };
   },
 };
@@ -297,8 +336,22 @@ export default {
   width: 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 6px;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
+}
+.table__header--sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+.table__header--sortable:hover {
+  opacity: 0.85;
+}
+.header--sort-icon {
+  font-size: 0.72rem;
+  line-height: 1;
 }
 .table__data__row {
   display: flex;
