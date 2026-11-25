@@ -3,7 +3,7 @@
     <!-- Barra de búsqueda -->
     <div class="table__search">
       <div class="table__search-box">
-        <span class="table__search-icon" aria-hidden="true">🔍</span>
+        <magnify class="table__search-icon" aria-hidden="true" />
         <input
           type="text"
           v-model="searchQuery"
@@ -19,7 +19,7 @@
           title="Limpiar búsqueda"
           @click="clearSearch"
         >
-          ✕
+          <close />
         </button>
       </div>
     </div>
@@ -141,7 +141,8 @@
           title="Recargar desde el servidor"
           @click="refreshData"
         >
-          ↻ Actualizar
+          <refresh class="pagination__refresh-icon" />
+          <span>Actualizar</span>
         </button>
       </div>
     </div>
@@ -150,7 +151,7 @@
 
 <script>
 import Http from "../lib/http";
-import { LeadPencil, DeleteEmpty, EyePlus } from "mdue";
+import { LeadPencil, DeleteEmpty, EyePlus, Magnify, Close, Refresh } from "mdue";
 import { get } from "simple-object-query";
 
 // Estado de paginación y ordenamiento en memoria por endpoint (sobrevive a la navegación SPA, se limpia con F5)
@@ -164,6 +165,9 @@ export default {
     LeadPencil,
     DeleteEmpty,
     EyePlus,
+    Magnify,
+    Close,
+    Refresh,
   },
 
   computed: {
@@ -454,13 +458,16 @@ export default {
 .table__search-icon {
   position: absolute;
   left: 12px;
-  font-size: 0.95rem;
+  font-size: 1.2rem;
+  color: #475569;
+  fill: currentColor;
+  display: inline-flex;
+  align-items: center;
   pointer-events: none;
-  opacity: 0.65;
 }
 .table__search-input {
   width: 100%;
-  padding: 10px 38px 10px 38px;
+  padding: 10px 38px 10px 40px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #ffffff;
@@ -475,13 +482,16 @@ export default {
 }
 .table__search-clear {
   position: absolute;
-  right: 10px;
+  right: 8px;
   border: none;
   background: transparent;
   color: #64748b;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 4px;
   border-radius: 4px;
 }
 .table__search-clear:hover {
@@ -608,5 +618,12 @@ export default {
 .pagination__btn--refresh {
   margin-left: 6px;
   background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pagination__refresh-icon {
+  font-size: 1rem;
+  display: inline-flex;
 }
 </style>
