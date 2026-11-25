@@ -129,6 +129,9 @@ import Http from "../lib/http";
 import { LeadPencil, DeleteEmpty, EyePlus } from "mdue";
 import { get } from "simple-object-query";
 
+// Estado de paginación y ordenamiento en memoria por endpoint (sobrevive a la navegación SPA, se limpia con F5)
+const tableStateCache = new Map();
+
 export default {
   name: "Table",
   props: ["columns", "actions", "api_endpoint", "sorting_column"],
@@ -168,6 +171,21 @@ export default {
   },
 
   methods: {
+    saveTableState() {
+      if (!this.api_endpoint) return;
+      tableStateCache.set(this.api_endpoint, {
+        currentPage: this.currentPage,
+        pageSize: this.pageSize,
+        sortOrder: this.sortOrder,
+      });
+    },
+    restoreTableState() {
+      if (!this.api_endpoint || !tableStateCache.has(this.api_endpoint)) return;
+      const saved = tableStateCache.get(this.api_endpoint);
+      if (saved.currentPage) this.currentPage = saved.currentPage;
+      if (saved.pageSize) this.pageSize = saved.pageSize;
+      if (saved.sortOrder) this.sortOrder = saved.sortOrder;
+    },
     isSortableColumn(idx) {
       return Boolean(
         this.columns &&
@@ -178,6 +196,7 @@ export default {
     toggleSortOrder() {
       this.sortOrder = this.sortOrder === "asc" ? "desc" : "asc";
       this.currentPage = 1;
+      this.saveTableState();
       if (this.isServerPaginated) {
         this.callAPI(false);
       } else {
@@ -194,7 +213,13 @@ export default {
       this.loading = true;
       const http = new Http();
       const endpoint = this.buildEndpointUrl();
-      const response = await http.authGet(endpoint, { forceRefresh });
+      let response = await http.authGet(endpoint, { forceRefresh });
+      // Si la página guardada ya no existe (ej. tras eliminar elementos), volver a página 1
+      if (response && response.status === 404 && this.currentPage > 1) {
+        this.currentPage = 1;
+        this.saveTableState();
+        response = await http.authGet(this.buildEndpointUrl(), { forceRefresh });
+      }
       this.mapData(response);
       this.loading = false;
     },
@@ -258,6 +283,10 @@ export default {
       }
     },
     sliceClientPage() {
+      if (this.currentPage > this.totalPages) {
+        this.currentPage = this.totalPages;
+        this.saveTableState();
+      }
       const start = (this.currentPage - 1) * this.pageSize;
       const end = start + this.pageSize;
       this.table_data = this.all_rows.slice(start, end);
@@ -267,6 +296,7 @@ export default {
         return;
       }
       this.currentPage = page;
+      this.saveTableState();
       if (this.isServerPaginated) {
         this.callAPI(false);
       } else {
@@ -275,6 +305,7 @@ export default {
     },
     onPageSizeChange() {
       this.currentPage = 1;
+      this.saveTableState();
       if (this.isServerPaginated) {
         this.callAPI(false);
       } else {
@@ -296,6 +327,7 @@ export default {
       return;
     }
     this.has_actions = this.actions.length !== 0;
+    this.restoreTableState();
     this.mapHeader();
     this.callAPI(false);
   },
