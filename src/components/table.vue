@@ -616,7 +616,7 @@ export default {
   line-height: 1;
 }
 .table__data {
-  max-height: calc(100vh - 270px);
+  max-height: calc(100vh - 185px);
   min-height: 200px;
   overflow-y: auto;
   overflow-x: hidden;

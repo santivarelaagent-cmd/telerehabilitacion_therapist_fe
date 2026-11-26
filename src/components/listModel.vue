@@ -149,6 +149,14 @@ export default {
   margin: 0;
 }
 .header .btn-success {
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 6px;
+  font-size: 0.88rem;
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
