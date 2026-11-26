@@ -102,6 +102,7 @@
     <div class="table__data" v-if="!loading && table_data.length > 0">
       <div
         class="table__data__row light-bg"
+        :class="{ 'table__data__row--selected': selectedRowId !== null && row[0] === selectedRowId }"
         v-for="(row, idx) in table_data"
         :key="row[0] !== undefined ? row[0] : idx"
       >
@@ -112,7 +113,7 @@
         >
           <span
             :class="['dark-text', 'light-font', { 'table__cell--link': isNameLinkColumn(cIdx) }]"
-            @click="isNameLinkColumn(cIdx) && $emit('detail', row[0])"
+            @click="isNameLinkColumn(cIdx) && handleDetail(row[0])"
           >{{ cell }}</span>
         </div>
         <div
@@ -122,7 +123,7 @@
           <button
             class="btn btn-dark"
             :id="'detail-' + row[0]"
-            @click="() => $emit('detail', row[0])"
+            @click="handleDetail(row[0])"
             v-if="actions.includes('detail')"
           >
             <eye-plus class="light-text" />
@@ -131,7 +132,7 @@
           <button
             class="btn btn-muted"
             :id="'update-' + row[0]"
-            @click="() => $emit('update', row[0])"
+            @click="handleUpdate(row[0])"
             v-if="actions.includes('update')"
           >
             <lead-pencil class="" />
@@ -263,6 +264,7 @@ export default {
         pageSize: this.pageSize,
         sortOrder: this.sortOrder,
         searchQuery: this.searchQuery,
+        selectedRowId: this.selectedRowId,
       });
     },
     restoreTableState() {
@@ -272,6 +274,17 @@ export default {
       if (saved.pageSize) this.pageSize = saved.pageSize;
       if (saved.sortOrder) this.sortOrder = saved.sortOrder;
       if (typeof saved.searchQuery === "string") this.searchQuery = saved.searchQuery;
+      if (saved.selectedRowId !== undefined) this.selectedRowId = saved.selectedRowId;
+    },
+    handleDetail(id) {
+      this.selectedRowId = id;
+      this.saveTableState();
+      this.$emit("detail", id);
+    },
+    handleUpdate(id) {
+      this.selectedRowId = id;
+      this.saveTableState();
+      this.$emit("update", id);
     },
     normalizeText(val) {
       return String(val ?? "")
@@ -503,6 +516,7 @@ export default {
       sortOrder: "asc",
       searchQuery: "",
       searchTimer: null,
+      selectedRowId: null,
     };
   },
 };
@@ -602,6 +616,14 @@ export default {
   flex-direction: row;
   justify-content: stretch;
   align-items: center;
+}
+.table__data__row--selected,
+.table__data__row--selected .table__data__cell {
+  background-color: #e2e8f0;
+}
+.table__data__row--selected .table__data__cell > span {
+  font-weight: 700 !important;
+  color: #0f172a;
 }
 .table__data__cell {
   margin: 0 10px;
