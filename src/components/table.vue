@@ -260,6 +260,7 @@
 import Http from "../lib/http";
 import { LeadPencil, DeleteEmpty, EyePlus, Magnify, Close, Refresh, History } from "mdue";
 import { get } from "simple-object-query";
+import { fuzzyMatchText } from "../utils/fuzzySearch";
 
 // Estado de paginación y ordenamiento en memoria por endpoint (sobrevive a la navegación SPA, se limpia con F5)
 const tableStateCache = new Map();
@@ -306,11 +307,9 @@ export default {
       return pages;
     },
     filteredSearchHistory() {
-      const query = this.normalizeText((this.searchQuery || "").trim());
+      const query = (this.searchQuery || "").trim();
       if (!query) return this.searchHistory;
-      return this.searchHistory.filter((item) =>
-        this.normalizeText(item).includes(query)
-      );
+      return this.searchHistory.filter((item) => fuzzyMatchText(query, item));
     },
   },
 
@@ -335,11 +334,17 @@ export default {
       if (saved.selectedRowId !== undefined) this.selectedRowId = saved.selectedRowId;
     },
     handleDetail(id) {
+      if ((this.searchQuery || "").trim()) {
+        this.addToSearchHistory(this.searchQuery);
+      }
       this.selectedRowId = id;
       this.saveTableState();
       this.$emit("detail", id);
     },
     handleUpdate(id) {
+      if ((this.searchQuery || "").trim()) {
+        this.addToSearchHistory(this.searchQuery);
+      }
       this.selectedRowId = id;
       this.saveTableState();
       this.$emit("update", id);
@@ -397,6 +402,10 @@ export default {
       this.showSearchHistory = false;
     },
     onSearchBlur() {
+      const trimmed = (this.searchQuery || "").trim();
+      if (trimmed) {
+        this.addToSearchHistory(trimmed);
+      }
       setTimeout(() => {
         this.showSearchHistory = false;
       }, 120);
@@ -407,7 +416,7 @@ export default {
         clearTimeout(this.searchTimer);
       }
       this.searchTimer = setTimeout(() => {
-        this.applySearch();
+        this.applySearch(false);
       }, 300);
     },
     triggerSearchNow() {
@@ -416,15 +425,15 @@ export default {
         this.searchTimer = null;
       }
       this.showSearchHistory = false;
-      this.applySearch();
+      this.applySearch(true);
     },
     clearSearch() {
       this.searchQuery = "";
       this.triggerSearchNow();
     },
-    applySearch() {
+    applySearch(saveHistory = false) {
       const trimmed = (this.searchQuery || "").trim();
-      if (trimmed) {
+      if (saveHistory && trimmed) {
         this.addToSearchHistory(trimmed);
       }
       this.currentPage = 1;
@@ -507,13 +516,14 @@ export default {
       return String(valA ?? "").localeCompare(String(valB ?? ""), undefined, { numeric: true }) * dir;
     },
     sortClientRows() {
-      const trimmed = this.normalizeText((this.searchQuery || "").trim());
+      const trimmed = (this.searchQuery || "").trim();
       const filteredRaw = trimmed
-        ? this.raw_rows.filter((row) =>
-            this.columns.some((col) =>
-              this.normalizeText(get(row, col.query)).includes(trimmed)
-            )
-          )
+        ? this.raw_rows.filter((row) => {
+            const combined = this.columns
+              .map((col) => String(get(row, col.query) ?? ""))
+              .join(" ");
+            return fuzzyMatchText(trimmed, combined);
+          })
         : this.raw_rows;
       const sortedRaw = [...filteredRaw].sort((a, b) =>
         this.compareBySortColumn(a, b)
@@ -645,6 +655,12 @@ export default {
   width: 100%;
   display: flex;
   flex-direction: column;
+  font-family: 'Open Sans', sans-serif;
+}
+.table input,
+.table select,
+.table button {
+  font-family: 'Open Sans', sans-serif;
 }
 .table__search {
   display: flex;
