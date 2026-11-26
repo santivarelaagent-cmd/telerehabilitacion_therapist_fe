@@ -1,11 +1,12 @@
 <template>
-  <div class="sidebar dark-bg light-text light-font">
+  <div :class="['sidebar', 'dark-bg', 'light-text', 'light-font', { 'sidebar--collapsed': !open }]">
     <ul>
       <li
         :class="{
           sidebar__item: true,
           sidebar__item__active: activeRoute.therapies,
         }"
+        data-tooltip="Terapias"
         @click="() => goTo('/therapies')"
       >
         <hospital-box class="sidebar__item--icon" />
@@ -16,6 +17,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.routines,
         }"
+        data-tooltip="Rutinas"
         @click="() => goTo('/routines')"
       >
         <clipboard-list class="sidebar__item--icon" />
@@ -26,6 +28,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.exercises,
         }"
+        data-tooltip="Ejercicios"
         @click="() => goTo('/exercises')"
       >
         <run class="sidebar__item--icon" />
@@ -36,6 +39,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.my_patients,
         }"
+        data-tooltip="Mis pacientes"
         @click="() => goTo('/my-patients')"
         v-show="groups.includes('Therapist')"
       >
@@ -45,8 +49,9 @@
       <li
         :class="{
           sidebar__item: true,
-          sidebar__item__active: activeRoute.therapists,
+          sidebar__item__active: activeRoute.admins,
         }"
+        data-tooltip="Administradores"
         @click="() => goTo('/admins')"
         v-show="groups.includes('Admin')"
       >
@@ -58,6 +63,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.therapists,
         }"
+        data-tooltip="Terapeutas"
         @click="() => goTo('/therapists')"
         v-show="groups.includes('Admin')"
       >
@@ -69,6 +75,7 @@
           sidebar__item: true,
           sidebar__item__active: activeRoute.patients,
         }"
+        data-tooltip="Pacientes"
         @click="() => goTo('/patients')"
         v-show="groups.includes('Admin')"
       >
@@ -117,6 +124,8 @@ export default {
         this.activateRoute("exercises");
       } else if (this.$route.path.startsWith("/my-patients")) {
         this.activateRoute("my_patients");
+      } else if (this.$route.path.startsWith("/admins")) {
+        this.activateRoute("admins");
       } else if (this.$route.path.startsWith("/therapists")) {
         this.activateRoute("therapists");
       } else if (this.$route.path.startsWith("/patients")) {
@@ -142,6 +151,7 @@ export default {
         routines: false,
         exercises: false,
         my_patients: false,
+        admins: false,
         therapists: false,
         patients: false,
       },
@@ -153,6 +163,8 @@ export default {
 
 <style scoped lang="scss">
 .sidebar {
+  position: relative;
+  z-index: 20;
   padding: 10px 0 10px 0;
 }
 .sidebar ul {
@@ -161,6 +173,7 @@ export default {
   list-style: none;
 }
 .sidebar__item {
+  position: relative;
   display: flex;
   align-items: center;
   height: 30px;
@@ -170,6 +183,52 @@ export default {
 .sidebar__item:hover {
   text-decoration: underline;
   cursor: pointer;
+}
+.sidebar--collapsed .sidebar__item:hover {
+  text-decoration: none;
+}
+.sidebar--collapsed .sidebar__item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 30;
+}
+.sidebar--collapsed .sidebar__item::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 5px 6px 5px 0;
+  border-style: solid;
+  border-color: transparent #1e293b transparent transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  z-index: 30;
+}
+.sidebar--collapsed .sidebar__item:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+.sidebar--collapsed .sidebar__item:hover::before {
+  opacity: 1;
+  visibility: visible;
 }
 .sidebar__item--text {
   padding-left: 10px;
