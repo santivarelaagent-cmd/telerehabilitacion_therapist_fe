@@ -56,7 +56,10 @@
           v-for="(cell, cIdx) in row"
           :key="cIdx"
         >
-          <span class="dark-text light-font">{{ cell }}</span>
+          <span
+            :class="['dark-text', 'light-font', { 'table__cell--link': isNameLinkColumn(cIdx) }]"
+            @click="isNameLinkColumn(cIdx) && $emit('detail', row[0])"
+          >{{ cell }}</span>
         </div>
         <div
           class="table__data__cell table__data__cell--action"
@@ -251,6 +254,19 @@ export default {
         this.totalItems = this.all_rows.length;
         this.sliceClientPage();
       }
+    },
+    isNameLinkColumn(cIdx) {
+      if (!this.actions || !this.actions.includes("detail")) return false;
+      const col = this.columns && this.columns[cIdx];
+      if (!col) return false;
+      const q = (col.query || "").toLowerCase();
+      const v = (col.verbose || "").toLowerCase();
+      return (
+        q === "name" ||
+        q.includes("first_name") ||
+        v === "nombre" ||
+        v === "nombres"
+      );
     },
     isSortableColumn(idx) {
       return Boolean(
@@ -545,6 +561,14 @@ export default {
 .table__data__cell--action {
   display: flex;
   flex-wrap: wrap;
+}
+.table__cell--link {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.table__cell--link:hover {
+  text-decoration: underline;
+  color: #0f172a;
 }
 .table__loading {
   height: 100%;
