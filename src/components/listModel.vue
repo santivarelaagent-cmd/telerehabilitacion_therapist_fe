@@ -148,4 +148,12 @@ export default {
 .header__title {
   margin: 0;
 }
+.header .btn-success {
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.header .btn-success:hover {
+  transform: scale(1.06);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.2);
+}
 </style>

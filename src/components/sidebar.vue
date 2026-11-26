@@ -184,8 +184,28 @@ export default {
   text-decoration: underline;
   cursor: pointer;
 }
+.sidebar__item--icon {
+  display: inline-flex;
+  transition: transform 0.16s ease;
+}
+.sidebar__item--text {
+  padding-left: 10px;
+  white-space: nowrap;
+  display: inline-block;
+  transform-origin: left center;
+  transition: transform 0.16s ease;
+}
+.sidebar__item:hover .sidebar__item--icon {
+  transform: scale(1.12);
+}
+.sidebar__item:hover .sidebar__item--text {
+  transform: scale(1.05);
+}
 .sidebar--collapsed .sidebar__item:hover {
   text-decoration: none;
+}
+.sidebar--collapsed .sidebar__item:hover .sidebar__item--icon {
+  transform: scale(1.18);
 }
 .sidebar--collapsed .sidebar__item::after {
   content: attr(data-tooltip);
@@ -229,10 +249,6 @@ export default {
 .sidebar--collapsed .sidebar__item:hover::before {
   opacity: 1;
   visibility: visible;
-}
-.sidebar__item--text {
-  padding-left: 10px;
-  white-space: nowrap;
 }
 .sidebar__item__active {
   border-left: 2px solid $primary;

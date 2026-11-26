@@ -124,32 +124,32 @@
           <button
             class="btn btn-dark table__action-btn"
             :id="'detail-' + row[0]"
-            title="Ver más"
+            data-tooltip="Ver más"
+            aria-label="Ver más"
             @click="handleDetail(row[0])"
             v-if="actions.includes('detail')"
           >
             <eye-plus class="light-text table__action-icon" />
-            <span class="table__action-label">Ver más</span>
           </button>
           <button
             class="btn btn-muted table__action-btn"
             :id="'update-' + row[0]"
-            title="Actualizar"
+            data-tooltip="Actualizar"
+            aria-label="Actualizar"
             @click="handleUpdate(row[0])"
             v-if="actions.includes('update')"
           >
             <lead-pencil class="table__action-icon" />
-            <span class="table__action-label">Actualizar</span>
           </button>
           <button
             class="btn btn-danger table__action-btn"
             :id="'delete-' + row[0]"
-            title="Eliminar"
+            data-tooltip="Eliminar"
+            aria-label="Eliminar"
             @click="() => $emit('delete', row[0])"
             v-if="actions.includes('delete')"
           >
             <delete-empty class="light-text table__action-icon" />
-            <span class="table__action-label">Eliminar</span>
           </button>
         </div>
       </div>
@@ -653,71 +653,89 @@ export default {
   word-break: break-word;
 }
 .table__data__cell--action {
-  container-type: inline-size;
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
 }
 .table__action-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   align-self: center;
-  height: auto !important;
-  max-height: 36px;
-  gap: 5px;
-  padding: 6px 10px;
+  height: 34px !important;
+  width: 34px;
+  padding: 0;
   border-radius: 6px;
-  white-space: nowrap;
   cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, padding 0.16s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 .table__action-btn:hover {
-  transform: scale(1.08);
+  transform: scale(1.12);
   box-shadow: 0 3px 8px rgba(15, 23, 42, 0.22);
-  z-index: 2;
+  z-index: 10;
+}
+.table__action-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: #1e293b;
+  color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+.table__action-btn::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px 5px 0 5px;
+  border-style: solid;
+  border-color: #1e293b transparent transparent transparent;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+.table__action-btn:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+.table__action-btn:hover::before {
+  opacity: 1;
+  visibility: visible;
 }
 .table__action-icon {
-  font-size: 1rem;
+  font-size: 1.1rem;
   display: inline-flex;
   flex-shrink: 0;
 }
-.table__action-label {
-  display: inline-block;
-}
-@container (max-width: 265px) {
-  .table__action-btn {
-    padding: 7px 9px;
-    gap: 0;
-  }
-  .table__action-label {
-    display: none;
-  }
-  .table__action-btn:hover {
-    transform: scale(1.14);
-  }
-}
-@media (max-width: 1100px) {
-  .table__action-btn {
-    padding: 7px 9px;
-    gap: 0;
-  }
-  .table__action-label {
-    display: none;
-  }
-  .table__action-btn:hover {
-    transform: scale(1.14);
-  }
-}
 .table__cell--link {
   cursor: pointer;
-  transition: color 0.15s ease;
+  transform-origin: left center;
+  transition: color 0.15s ease, transform 0.16s ease;
 }
 .table__cell--link:hover {
   text-decoration: underline;
   color: #0f172a;
+  transform: scale(1.04);
 }
 .table__loading {
   height: 100%;
