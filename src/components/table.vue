@@ -112,7 +112,8 @@
           :key="cIdx"
         >
           <span
-            :class="['dark-text', 'light-font', { 'table__cell--link': isNameLinkColumn(cIdx) }]"
+            :class="['dark-text', 'light-font', 'table__cell-text', { 'table__cell--link': isNameLinkColumn(cIdx) }]"
+            :title="String(cell || '').length > 90 ? cell : ''"
             @click="isNameLinkColumn(cIdx) && handleDetail(row[0])"
           >{{ cell }}</span>
         </div>
@@ -619,6 +620,8 @@ export default {
   flex-direction: row;
   justify-content: stretch;
   align-items: stretch;
+  min-height: 48px;
+  border-bottom: 1px solid #e2e8f0;
 }
 .table__data__row--selected,
 .table__data__row--selected .table__data__cell {
@@ -632,11 +635,22 @@ export default {
   margin: 0 10px;
   padding: 8px 6px;
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
+}
+.table__cell-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  max-height: 4.2em;
+  word-break: break-word;
 }
 .table__data__cell--action {
   container-type: inline-size;
@@ -650,6 +664,9 @@ export default {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
+  height: auto !important;
+  max-height: 36px;
   gap: 5px;
   padding: 6px 10px;
   border-radius: 6px;
