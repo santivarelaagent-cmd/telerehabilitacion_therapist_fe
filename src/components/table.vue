@@ -121,31 +121,34 @@
           v-if="has_actions"
         >
           <button
-            class="btn btn-dark"
+            class="btn btn-dark table__action-btn"
             :id="'detail-' + row[0]"
+            title="Ver más"
             @click="handleDetail(row[0])"
             v-if="actions.includes('detail')"
           >
-            <eye-plus class="light-text" />
-            <span>Ver más</span>
+            <eye-plus class="light-text table__action-icon" />
+            <span class="table__action-label">Ver más</span>
           </button>
           <button
-            class="btn btn-muted"
+            class="btn btn-muted table__action-btn"
             :id="'update-' + row[0]"
+            title="Actualizar"
             @click="handleUpdate(row[0])"
             v-if="actions.includes('update')"
           >
-            <lead-pencil class="" />
-            <span>Actualizar</span>
+            <lead-pencil class="table__action-icon" />
+            <span class="table__action-label">Actualizar</span>
           </button>
           <button
-            class="btn btn-danger"
+            class="btn btn-danger table__action-btn"
             :id="'delete-' + row[0]"
+            title="Eliminar"
             @click="() => $emit('delete', row[0])"
             v-if="actions.includes('delete')"
           >
-            <delete-empty class="light-text" />
-            <span>Eliminar</span>
+            <delete-empty class="light-text table__action-icon" />
+            <span class="table__action-label">Eliminar</span>
           </button>
         </div>
       </div>
@@ -615,7 +618,7 @@ export default {
   display: flex;
   flex-direction: row;
   justify-content: stretch;
-  align-items: center;
+  align-items: stretch;
 }
 .table__data__row--selected,
 .table__data__row--selected .table__data__cell {
@@ -627,16 +630,69 @@ export default {
 }
 .table__data__cell {
   margin: 0 10px;
-  padding: 5px;
+  padding: 8px 6px;
   width: 100%;
   display: flex;
+  align-items: center;
   justify-content: flex-start;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
 }
 .table__data__cell--action {
+  container-type: inline-size;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.table__action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, padding 0.16s ease;
+}
+.table__action-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.22);
+  z-index: 2;
+}
+.table__action-icon {
+  font-size: 1rem;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.table__action-label {
+  display: inline-block;
+}
+@container (max-width: 265px) {
+  .table__action-btn {
+    padding: 7px 9px;
+    gap: 0;
+  }
+  .table__action-label {
+    display: none;
+  }
+  .table__action-btn:hover {
+    transform: scale(1.14);
+  }
+}
+@media (max-width: 1100px) {
+  .table__action-btn {
+    padding: 7px 9px;
+    gap: 0;
+  }
+  .table__action-label {
+    display: none;
+  }
+  .table__action-btn:hover {
+    transform: scale(1.14);
+  }
 }
 .table__cell--link {
   cursor: pointer;
