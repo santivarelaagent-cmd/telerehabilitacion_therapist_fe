@@ -615,6 +615,28 @@ export default {
   font-size: 0.72rem;
   line-height: 1;
 }
+.table__data {
+  max-height: calc(100vh - 270px);
+  min-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: auto;
+  border-radius: 6px;
+}
+.table__data::-webkit-scrollbar {
+  width: 7px;
+}
+.table__data::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+.table__data::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.table__data::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
 .table__data__row {
   display: flex;
   flex-direction: row;
@@ -622,6 +644,20 @@ export default {
   align-items: stretch;
   min-height: 48px;
   border-bottom: 1px solid #e2e8f0;
+}
+.table__data__row:first-child .table__action-btn::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+  transform: translateX(-50%) translateY(-3px);
+}
+.table__data__row:first-child .table__action-btn:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+.table__data__row:first-child .table__action-btn::before {
+  bottom: auto;
+  top: calc(100% + 3px);
+  border-width: 0 5px 5px 5px;
+  border-color: transparent transparent #1e293b transparent;
 }
 .table__data__row--selected,
 .table__data__row--selected .table__data__cell {
