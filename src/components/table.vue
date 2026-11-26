@@ -24,6 +24,60 @@
       </div>
     </div>
 
+    <!-- Barra de paginación superior -->
+    <div class="table__pagination table__pagination--top" v-if="!loading && totalItems > 0">
+      <div class="pagination__info dark-text light-font">
+        Mostrando {{ rangeStart }}–{{ rangeEnd }} de {{ totalItems }} registros
+      </div>
+
+      <div class="pagination__controls">
+        <label class="pagination__size dark-text light-font">
+          Por página:
+          <select v-model.number="pageSize" @change="onPageSizeChange" class="pagination__select">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+        </label>
+
+        <button
+          class="pagination__btn"
+          :disabled="currentPage <= 1"
+          @click="goToPage(currentPage - 1)"
+        >
+          ‹ Anterior
+        </button>
+
+        <button
+          v-for="page in visiblePages"
+          :key="'top-' + page"
+          class="pagination__btn"
+          :class="{ 'pagination__btn--active': page === currentPage }"
+          @click="goToPage(page)"
+        >
+          {{ page }}
+        </button>
+
+        <button
+          class="pagination__btn"
+          :disabled="currentPage >= totalPages"
+          @click="goToPage(currentPage + 1)"
+        >
+          Siguiente ›
+        </button>
+
+        <button
+          class="pagination__btn pagination__btn--refresh"
+          title="Recargar desde el servidor"
+          @click="refreshData"
+        >
+          <refresh class="pagination__refresh-icon" />
+          <span>Actualizar</span>
+        </button>
+      </div>
+    </div>
+
     <div class="table__header">
       <div
         class="table__header--item dark-bg"
@@ -586,6 +640,13 @@ export default {
   padding: 14px 12px;
   margin-top: 8px;
   border-top: 1px solid #e2e8f0;
+}
+.table__pagination--top {
+  margin-top: 0;
+  margin-bottom: 12px;
+  padding: 4px 12px 12px 12px;
+  border-top: none;
+  border-bottom: 1px solid #e2e8f0;
 }
 .pagination__info {
   font-size: 0.9rem;
