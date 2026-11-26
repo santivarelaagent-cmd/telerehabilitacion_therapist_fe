@@ -154,36 +154,48 @@
           v-for="(cell, cIdx) in row"
           :key="cIdx"
         >
-          <span
-            :class="['dark-text', 'light-font', 'table__cell-text', { 'table__cell--link': isNameLinkColumn(cIdx) }]"
+          <a
+            v-if="isNameLinkColumn(cIdx)"
+            :href="getActionHref('detail', row[0])"
+            class="dark-text light-font table__cell-text table__cell--link"
             :title="String(cell || '').length > 90 ? cell : ''"
-            @click="isNameLinkColumn(cIdx) && handleDetail(row[0])"
+            @click="onDetailClick($event, row[0])"
+            @auxclick="onAuxSelect(row[0])"
+          >{{ cell }}</a>
+          <span
+            v-else
+            class="dark-text light-font table__cell-text"
+            :title="String(cell || '').length > 90 ? cell : ''"
           >{{ cell }}</span>
         </div>
         <div
           class="table__data__cell table__data__cell--action"
           v-if="has_actions"
         >
-          <button
+          <a
             class="btn btn-dark table__action-btn"
             :id="'detail-' + row[0]"
+            :href="getActionHref('detail', row[0])"
             data-tooltip="Ver más"
             aria-label="Ver más"
-            @click="handleDetail(row[0])"
+            @click="onDetailClick($event, row[0])"
+            @auxclick="onAuxSelect(row[0])"
             v-if="actions.includes('detail')"
           >
             <eye-plus class="light-text table__action-icon" />
-          </button>
-          <button
+          </a>
+          <a
             class="btn btn-muted table__action-btn"
             :id="'update-' + row[0]"
+            :href="getActionHref('update', row[0])"
             data-tooltip="Actualizar"
             aria-label="Actualizar"
-            @click="handleUpdate(row[0])"
+            @click="onUpdateClick($event, row[0])"
+            @auxclick="onAuxSelect(row[0])"
             v-if="actions.includes('update')"
           >
             <lead-pencil class="table__action-icon" />
-          </button>
+          </a>
           <button
             class="btn btn-danger table__action-btn"
             :id="'delete-' + row[0]"
@@ -333,20 +345,39 @@ export default {
       if (typeof saved.searchQuery === "string") this.searchQuery = saved.searchQuery;
       if (saved.selectedRowId !== undefined) this.selectedRowId = saved.selectedRowId;
     },
-    handleDetail(id) {
+    getActionHref(type, id) {
+      const basePath = (this.$route && this.$route.path ? this.$route.path : "").replace(/\/+$/, "");
+      if (!basePath || id === undefined || id === null) return "#";
+      const targetPath = type === "update" ? `${basePath}/${id}/edit` : `${basePath}/${id}`;
+      if (this.$router && typeof this.$router.resolve === "function") {
+        return this.$router.resolve(targetPath).href;
+      }
+      return targetPath;
+    },
+    markRowSelected(id) {
       if ((this.searchQuery || "").trim()) {
         this.addToSearchHistory(this.searchQuery);
       }
       this.selectedRowId = id;
       this.saveTableState();
+    },
+    onAuxSelect(id) {
+      this.markRowSelected(id);
+    },
+    onDetailClick(event, id) {
+      this.markRowSelected(id);
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1)) {
+        return;
+      }
+      if (event) event.preventDefault();
       this.$emit("detail", id);
     },
-    handleUpdate(id) {
-      if ((this.searchQuery || "").trim()) {
-        this.addToSearchHistory(this.searchQuery);
+    onUpdateClick(event, id) {
+      this.markRowSelected(id);
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1)) {
+        return;
       }
-      this.selectedRowId = id;
-      this.saveTableState();
+      if (event) event.preventDefault();
       this.$emit("update", id);
     },
     normalizeText(val) {
@@ -876,7 +907,8 @@ export default {
 .table__data__row--selected .table__data__cell {
   background-color: #e2e8f0;
 }
-.table__data__row--selected .table__data__cell > span {
+.table__data__row--selected .table__data__cell > span,
+.table__data__row--selected .table__data__cell > a.table__cell--link {
   font-weight: 700 !important;
   color: #0f172a;
 }
@@ -918,6 +950,8 @@ export default {
   width: 34px;
   padding: 0;
   border-radius: 6px;
+  text-decoration: none;
+  box-sizing: border-box;
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
@@ -978,6 +1012,7 @@ export default {
 }
 .table__cell--link {
   cursor: pointer;
+  text-decoration: none;
   transform-origin: left center;
   transition: color 0.15s ease, transform 0.16s ease;
 }
