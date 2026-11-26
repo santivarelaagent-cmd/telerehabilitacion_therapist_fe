@@ -1,26 +1,67 @@
 <template>
   <div class="table">
-    <!-- Barra de búsqueda -->
+    <!-- Barra de búsqueda con historial -->
     <div class="table__search">
       <div class="table__search-box">
         <magnify class="table__search-icon" aria-hidden="true" />
         <input
           type="text"
           v-model="searchQuery"
+          @focus="showSearchHistory = true"
+          @blur="onSearchBlur"
           @input="onSearchInput"
           @keyup.enter="triggerSearchNow"
+          @keyup.esc="showSearchHistory = false"
           class="table__search-input"
           placeholder="Buscar por nombre, descripción o ID..."
+          autocomplete="off"
         />
         <button
           v-if="searchQuery"
           type="button"
           class="table__search-clear"
           title="Limpiar búsqueda"
+          @mousedown.prevent
           @click="clearSearch"
         >
           <close />
         </button>
+
+        <!-- Desplegable de historial de búsqueda -->
+        <div
+          v-if="showSearchHistory && filteredSearchHistory.length > 0"
+          class="table__search-history"
+        >
+          <div class="search-history__header">
+            <span>Búsquedas recientes</span>
+            <button
+              type="button"
+              class="search-history__clear-all"
+              @mousedown.prevent="clearAllSearchHistory"
+            >
+              Borrar todo
+            </button>
+          </div>
+          <ul class="search-history__list">
+            <li
+              v-for="term in filteredSearchHistory"
+              :key="term"
+              class="search-history__item"
+              @mousedown.prevent="selectSearchHistory(term)"
+            >
+              <history-icon class="search-history__icon" />
+              <span class="search-history__term">{{ term }}</span>
+              <button
+                type="button"
+                class="search-history__remove"
+                title="Quitar del historial"
+                @mousedown.prevent.stop="removeSearchHistoryItem(term)"
+              >
+                <close />
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -34,10 +75,12 @@
         <label class="pagination__size dark-text light-font">
           Por página:
           <select v-model.number="pageSize" @change="onPageSizeChange" class="pagination__select">
+            <option :value="5">5</option>
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
             <option :value="100">100</option>
+            <option :value="300">300</option>
           </select>
         </label>
 
@@ -165,10 +208,12 @@
         <label class="pagination__size dark-text light-font">
           Por página:
           <select v-model.number="pageSize" @change="onPageSizeChange" class="pagination__select">
+            <option :value="5">5</option>
             <option :value="10">10</option>
             <option :value="20">20</option>
             <option :value="50">50</option>
             <option :value="100">100</option>
+            <option :value="300">300</option>
           </select>
         </label>
 
@@ -213,11 +258,12 @@
 
 <script>
 import Http from "../lib/http";
-import { LeadPencil, DeleteEmpty, EyePlus, Magnify, Close, Refresh } from "mdue";
+import { LeadPencil, DeleteEmpty, EyePlus, Magnify, Close, Refresh, History } from "mdue";
 import { get } from "simple-object-query";
 
 // Estado de paginación y ordenamiento en memoria por endpoint (sobrevive a la navegación SPA, se limpia con F5)
 const tableStateCache = new Map();
+const MAX_SEARCH_HISTORY = 8;
 
 export default {
   name: "Table",
@@ -230,6 +276,7 @@ export default {
     Magnify,
     Close,
     Refresh,
+    HistoryIcon: History,
   },
 
   computed: {
@@ -257,6 +304,13 @@ export default {
         pages.push(i);
       }
       return pages;
+    },
+    filteredSearchHistory() {
+      const query = this.normalizeText((this.searchQuery || "").trim());
+      if (!query) return this.searchHistory;
+      return this.searchHistory.filter((item) =>
+        this.normalizeText(item).includes(query)
+      );
     },
   },
 
@@ -296,7 +350,59 @@ export default {
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
     },
+    getSearchHistoryKey() {
+      return `table_search_history_${this.api_endpoint || "default"}`;
+    },
+    loadSearchHistory() {
+      try {
+        const raw = localStorage.getItem(this.getSearchHistoryKey());
+        const parsed = raw ? JSON.parse(raw) : [];
+        this.searchHistory = Array.isArray(parsed) ? parsed : [];
+      } catch (e) {
+        this.searchHistory = [];
+      }
+    },
+    persistSearchHistory() {
+      try {
+        localStorage.setItem(
+          this.getSearchHistoryKey(),
+          JSON.stringify(this.searchHistory)
+        );
+      } catch (e) {
+        // Ignorar errores de cuota de localStorage
+      }
+    },
+    addToSearchHistory(term) {
+      const clean = (term || "").trim();
+      if (clean.length < 2) return;
+      const normalized = this.normalizeText(clean);
+      const withoutDup = this.searchHistory.filter(
+        (item) => this.normalizeText(item) !== normalized
+      );
+      this.searchHistory = [clean, ...withoutDup].slice(0, MAX_SEARCH_HISTORY);
+      this.persistSearchHistory();
+    },
+    selectSearchHistory(term) {
+      this.searchQuery = term;
+      this.showSearchHistory = false;
+      this.triggerSearchNow();
+    },
+    removeSearchHistoryItem(term) {
+      this.searchHistory = this.searchHistory.filter((item) => item !== term);
+      this.persistSearchHistory();
+    },
+    clearAllSearchHistory() {
+      this.searchHistory = [];
+      this.persistSearchHistory();
+      this.showSearchHistory = false;
+    },
+    onSearchBlur() {
+      setTimeout(() => {
+        this.showSearchHistory = false;
+      }, 120);
+    },
     onSearchInput() {
+      this.showSearchHistory = true;
       if (this.searchTimer) {
         clearTimeout(this.searchTimer);
       }
@@ -309,6 +415,7 @@ export default {
         clearTimeout(this.searchTimer);
         this.searchTimer = null;
       }
+      this.showSearchHistory = false;
       this.applySearch();
     },
     clearSearch() {
@@ -316,6 +423,10 @@ export default {
       this.triggerSearchNow();
     },
     applySearch() {
+      const trimmed = (this.searchQuery || "").trim();
+      if (trimmed) {
+        this.addToSearchHistory(trimmed);
+      }
       this.currentPage = 1;
       this.saveTableState();
       if (this.isServerPaginated) {
@@ -494,6 +605,7 @@ export default {
       return;
     }
     this.has_actions = this.actions.length !== 0;
+    this.loadSearchHistory();
     this.restoreTableState();
     this.mapHeader();
     this.callAPI(false);
@@ -520,6 +632,8 @@ export default {
       sortOrder: "asc",
       searchQuery: "",
       searchTimer: null,
+      searchHistory: [],
+      showSearchHistory: false,
       selectedRowId: null,
     };
   },
@@ -584,6 +698,89 @@ export default {
 }
 .table__search-clear:hover {
   background: #f1f5f9;
+  color: #0f172a;
+}
+.table__search-history {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+  z-index: 30;
+  overflow: hidden;
+}
+.search-history__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+.search-history__clear-all {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.search-history__clear-all:hover {
+  color: #0f172a;
+  text-decoration: underline;
+}
+.search-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.search-history__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  color: #1e293b;
+  font-size: 0.9rem;
+  transition: background-color 0.12s ease;
+}
+.search-history__item:hover {
+  background: #f1f5f9;
+}
+.search-history__icon {
+  color: #64748b;
+  font-size: 1.05rem;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.search-history__term {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-history__remove {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+.search-history__remove:hover {
+  background: #e2e8f0;
   color: #0f172a;
 }
 .table__header {
